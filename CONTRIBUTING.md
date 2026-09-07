@@ -6,7 +6,7 @@ Thank you for your interest in contributing to SmartThink!
 
 ### Bug Reports
 
-Open an [issue](https://github.com/bkan-hq/smartthink/issues) with:
+Open an [issue](https://github.com/Bkankim/smartthink/issues) with:
 - SmartThink mode used (Deep / Agent / Light)
 - What you expected vs what happened
 - Claude Code version (`claude --version`)
@@ -30,22 +30,25 @@ Open an issue with the `enhancement` label. Describe:
 - New thinking modules or mental models (add to `skill/references/`)
 - Improvements to analysis methodology (`skill/references/analysis-method.md`)
 - Bug fixes in skill routing or mode handling (`skill/SKILL.md`)
+- Sub-agent behaviour (`agents/st-thinker.md`, `agents/st-searcher.md`)
 - Documentation improvements
 
 #### What NOT to change
 
-- `skill/.data/` — user-specific runtime data
-- Evolution state format — changing the slot format breaks semantic merge across sessions
+- `skill/.data/evolution-state.md` - keep it an empty template; real data lives in the user's vault
+- Evolution state format - changing the slot format breaks semantic merge across sessions
+- The wiring contract between `skill/SKILL.md`, `skill/references/thinker-prompt.md` and `agents/` - if you must, update all sides and keep `scripts/check-structure.py` green
 
 ### Development Setup
 
 ```bash
-git clone https://github.com/bkan-hq/smartthink.git
+git clone https://github.com/Bkankim/smartthink.git
 cd smartthink
 ./install.sh
+python3 scripts/check-structure.py   # must print 66/66 passed
 ```
 
-Test your changes by running `/smartthink light <topic>` in a new Claude Code session (fastest feedback loop).
+Test your changes by running `/smartthink --lite <topic>` in a new Claude Code session (fastest feedback loop), then `/smartthink <topic>` to exercise the sub-agents.
 
 ## Code of Conduct
 

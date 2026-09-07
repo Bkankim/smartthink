@@ -2,9 +2,9 @@ English | [한국어](README.ko.md)
 
 # SmartThink
 
-**천재적 사고 엔진 시스템** — A genius-level thinking engine for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+**천재적 사고 엔진 시스템** - A genius-level thinking engine for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
 
-SmartThink combines 9 thinking frameworks (81 mental models, TRIZ innovation principles, antifragile strategy, and more) with Cynefin-based situation diagnosis to deliver deep, creative analysis on any topic.
+SmartThink combines 9 thinking frameworks (81 mental models, 12 operating engines, TRIZ innovation principles, antifragile strategy, and more) with Cynefin-based situation diagnosis to deliver deep, creative analysis on any topic. It is a skill plus two dedicated sub-agents: the analysis body runs in its own context, and a search scout feeds it real-world data.
 
 ---
 
@@ -13,11 +13,12 @@ SmartThink combines 9 thinking frameworks (81 mental models, TRIZ innovation pri
 ### 1. Install
 
 ```bash
-git clone https://github.com/bkan-hq/smartthink.git
+git clone https://github.com/Bkankim/smartthink.git
 cd smartthink
-chmod +x install.sh uninstall.sh
 ./install.sh
 ```
+
+The installer creates three symlinks (`~/.claude/skills/smartthink`, `~/.claude/agents/st-thinker.md`, `~/.claude/agents/st-searcher.md`) and seeds an empty evolution vault at `~/.claude/smartthink-vault/`.
 
 ### 2. Open a new Claude Code session
 
@@ -25,7 +26,7 @@ chmod +x install.sh uninstall.sh
 claude
 ```
 
-> **Important**: Start a **new** session after installation. Existing sessions won't recognize the skill.
+> **Important**: Start a **new** session after installation. Existing sessions won't recognize the skill or the agents.
 
 ### 3. Try it
 
@@ -33,124 +34,88 @@ claude
 /smartthink 1인 기업의 확장 전략
 ```
 
-That's it! SmartThink will diagnose your topic, select the best thinking frameworks, and produce a full analysis with 10+ actionable ideas.
+`/st` works as a short alias. SmartThink diagnoses your topic, picks the best frameworks, gathers search data, and returns a full analysis with 6-10 actionable ideas.
 
 ---
 
 ## Three Modes
 
-### Deep Analysis (default)
+| Flag | Mode | Where it runs | Interaction |
+|------|------|---------------|-------------|
+| (none) | **Agent** (default) | `st-thinker` sub-agent | none during analysis, feedback loop after |
+| `--deep` | **Deep** | main agent | checkpoints at every decision point |
+| `--lite` / `--light` | **Light** | main agent, no reference modules | none |
 
-Full interactive analysis with 9 reference modules. The main agent loads frameworks into context and interactively refines direction with you. Produces 10+ ideas with feasibility, impact, and risk assessment.
+`--nosearch` skips web search in any mode. Web search is **on by default** in every mode.
+
+### Agent Analysis (default)
+
+The whole analysis is delegated to the `st-thinker` sub-agent (STSA). It loads the reference modules into its own context, so your main session stays lean. After it returns, the agent stays alive in the background: give feedback and it revises in place, say "확정" (confirm) and it writes the final insights to the evolution vault.
 
 ```
 /smartthink AI 스타트업에서 네트워크 효과를 만드는 방법
 ```
 
-Add `search` for data-backed analysis:
-```
-/smartthink search 2026년 SaaS 시장 트렌드
-```
+### Deep Analysis
 
-**What you get:**
-- Cynefin domain diagnosis (Clear / Complicated / Complex / Chaotic)
-- Multi-layer analysis from 3+ perspectives
-- 10+ genius ideas with engine/model used, feasibility, expected impact
-- Top 3 with unicorn potential assessment and execution roadmap
-- Actionable next steps
-- Brief export (if the topic has implementable tasks)
-
-### Agent Analysis
-
-Fully automated analysis delegated to a sub-agent (STSA). Same methodology as Deep mode, but all decisions are made automatically. Use when you want hands-off analysis.
+The main agent runs the analysis itself and checks in with you at each interaction point: Cynefin boundary, module selection, and the search data pack before the heavy reference load.
 
 ```
-/smartthink agent 1인 기업의 수익 모델 설계
+/smartthink --deep 1인 기업의 수익 모델 설계
 ```
-
-**When to use:** You want the same depth as Deep mode but prefer fully automated analysis without interaction points.
 
 ### Light Analysis
 
-Quick analysis without loading reference modules. Uses ~5% of context.
+Quick analysis using only Cynefin diagnosis plus first-principles decomposition, no reference modules loaded. Still runs the search scout unless `--nosearch` is given.
 
 ```
-/smartthink light 사이드 프로젝트 아이디어
+/smartthink --lite 사이드 프로젝트 아이디어
+/smartthink --lite --nosearch 사이드 프로젝트 아이디어
 ```
 
-**When to use:** Quick brainstorming, simple questions, or when you want to save context for other work.
+Legacy prefixes (`agent <topic>`, `light <topic>`, `search <topic>`) are still accepted as aliases, but `--` flags are the canonical form.
 
 ---
 
 ## What Happens Behind the Scenes
 
 ```
-You type: /smartthink [mode] 주제
+You type: /smartthink [--deep|--lite] [--nosearch] 주제
          ↓
-    ┌─────────────────────────┐
-    │  Main Agent              │
-    │  1. Cynefin 진단         │
-    │  2. 모듈 추천            │
-    │  3. 모드별 분기           │
-    └──────────┬──────────────┘
+    ┌─────────────────────────────────────┐
+    │  Main Agent                          │
+    │  1. Cynefin diagnosis                │
+    │  2. Topic classification + modules   │
+    │  3. Spawn st-searcher ──► data pack  │  (≤2K tokens, sources paired)
+    │  4. Mode branch                      │
+    └──────────┬──────────────────────────┘
                ↓
     ┌──────────┼──────────────┐
-    │          │              │
     ▼          ▼              ▼
-  Deep       Agent          Light
-  (inline)   (sub-agent)    (no refs)
-  - 모듈 직접  - STSA 위임    - 제1원리
-    로딩       - 자동 판단     - ~5% ctx
-  - 인터랙션   - 30 turns     - 3-5 ideas
-  - 10+ ideas - 10+ ideas
+  Agent       Deep          Light
+  st-thinker  main agent    main agent
+  (background (interactive) (no refs)
+   + feedback
+   loop)
 ```
 
-**Deep** loads reference modules into main context and interacts with you. **Agent** delegates to a sub-agent (STSA) for hands-off analysis. **Light** does quick analysis without loading any reference files.
+- **st-searcher** (Sonnet) digests raw search results in its own window and returns only a compact data pack: quantified table with sources, player list, trends plus at least one contrary signal, and source URLs. Raw pages never enter the main context.
+- **st-thinker** (inherits session model, 30-turn cap) runs the pipeline in `skill/references/analysis-method.md`: self-audit, module load, multi-layer analysis, cross-engine synthesis, idea generation, Top 3 with unicorn assessment, next steps.
 
 ---
 
 ## Evolution System
 
-SmartThink learns from each session and gets smarter over time.
+SmartThink learns from each session.
 
-**How it works:**
-- After each analysis, SmartThink records what worked and what was lacking
 - Effective thinking patterns are saved as **insights** (up to 10 slots)
 - Blind spots are tracked as **gaps** (up to 5 slots)
-- Module diversity is monitored — if you over-rely on one framework, SmartThink nudges you toward others
+- Module diversity is monitored so you don't over-rely on one framework
+- A self-audit step guards against the evolution state pre-deciding the conclusion
 
-**Example after 3 sessions:**
-```
-## 핵심 인사이트 (3/10)
-- **AI 레버리지 = 스케일 상한선 제거**: AI가 1인 기업의 매출 상한을 해방
-  적용 맥락: 1인 사업에서 팀 규모 제약 극복 시
-  근거: 전기가 공장 규모를 해방시킨 것과 동일 구조
+Evolution data lives **outside the repo** at `~/.claude/smartthink-vault/evolution-state.md` (override with `SMARTTHINK_VAULT`). Nothing personal is ever written into the cloned repo. The file `skill/.data/evolution-state.md` is only the empty template the installer seeds from.
 
-## 다양성 H=2.13(>=1.8). 원천: 핵심엔진3, 현실왜곡1, 패턴합성1
-```
-
-Your evolution data is stored in `skill/.data/evolution-state.md`. To preserve across machines:
-
-```bash
-cd smartthink
-git add skill/.data/evolution-state.md
-git commit -m "update insights"
-```
-
----
-
-## Brief Export
-
-When your topic has **implementable tasks** (code, system setup, etc.), SmartThink automatically generates a compressed brief:
-
-```
-skill/.data/briefs/
-  └── 2026-03/
-      └── 141530-seo-blog-automation/
-          └── brief.md          ← Top 3 ideas + execution plan
-```
-
-Briefs are gitignored by default (they contain session-specific analysis).
+In Agent mode the vault is updated only after you confirm the final version, so feedback-driven revisions never get stale insights recorded.
 
 ---
 
@@ -166,16 +131,36 @@ Briefs are gitignored by default (they contain session-specific analysis).
 | Execution Velocity | OODA Loop, Decision frameworks, Blitzscaling |
 | Antifragile Strategy | Barbell Strategy, Optionality, Black Swan positioning |
 | TRIZ Innovation | 40 Inventive Principles, Contradiction resolution |
-| Meta-Cognition | Recursive self-improvement, Wardley Mapping, Lollapalooza |
+| Meta-Cognition | Recursive self-improvement, Wardley Mapping, User frame bias detection |
 
-SmartThink automatically selects 2-3 modules based on your topic type (idea discovery, strategy, problem solving, etc.).
+SmartThink selects 2-3 modules based on your topic type (idea discovery, strategy, problem solving, decision, systematic invention, and so on).
+
+---
+
+## Repository Layout
+
+```
+skill/            the skill (SKILL.md + references/) - symlinked to ~/.claude/skills/smartthink
+agents/           st-thinker.md, st-searcher.md     - symlinked into ~/.claude/agents/
+scripts/          check-structure.py                - 66-point wiring check (skill <-> agents <-> prompt)
+install.sh        creates the symlinks and seeds the vault
+uninstall.sh      removes the symlinks, keeps the vault
+```
+
+Run the structure check after editing anything under `skill/` or `agents/`:
+
+```bash
+python3 scripts/check-structure.py             # checks the repo copy
+python3 scripts/check-structure.py --installed # checks what Claude Code actually loads
+```
 
 ---
 
 ## Requirements
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed and configured
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI with custom agents support
 - macOS or Linux (Windows: use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/))
+- Optional: the `insane-search` skill for reaching sites that block plain fetches. Without it, `st-searcher` simply skips blocked sources.
 
 ## Uninstallation
 
@@ -184,7 +169,7 @@ cd smartthink
 ./uninstall.sh
 ```
 
-Your evolution state and briefs remain in the repo. To fully remove, delete the cloned directory.
+Your evolution vault stays in place. Delete `~/.claude/smartthink-vault/` for a full reset.
 
 ## License
 
