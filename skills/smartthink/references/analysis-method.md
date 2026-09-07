@@ -354,7 +354,9 @@ sessions = (기존 sessions, 없으면 0) + 1
    - 백업 쓰기가 실패하면 **변환을 중단**한다. 백업 없는 변환은 금지다. 이번 세션 갱신을 건너뛰고 B-3의 실패 보고 형식으로 알린다.
 2. **변환 실행.**
    - `scripts/migrate-evolution.py`가 있으면 그것을 실행한다:
-     `uv run scripts/migrate-evolution.py {VAULT}/evolution-state.md` (uv 없으면 `python3`, D36 폴백 체인)
+     `uv run scripts/migrate-evolution.py {VAULT}/evolution-state.md --write` (uv 없으면 `python3`, D36 폴백 체인)
+     **`--write`가 없으면 dry-run이라 파일이 바뀌지 않는다.** 변환 전 결과를 먼저 보려면
+     `--write` 없이 한 번 실행해 요약을 확인한 뒤 `--write`로 다시 실행한다.
      종료 코드 0이고 결과 파일 첫 줄이 `---`이면 3번으로 간다.
    - **스크립트가 없거나 실패하면 아래 인라인 절차로 직접 변환한다. 스크립트 부재는 정상 상황이다**(축소 매트릭스).
 3. **검증**: 새 파일 첫 줄이 `---`, 헤더에 `version`·`updated`·`sessions`·`diversity_h`·`routing_weights` 5개 필드가 모두 있음, `.bak` 파일이 존재하고 비어 있지 않음. 하나라도 실패하면 `.bak`를 `evolution-state.md`로 되돌리고 사용자에게 보고한다.

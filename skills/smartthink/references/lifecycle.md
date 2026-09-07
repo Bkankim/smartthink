@@ -234,6 +234,9 @@ v2 산문 형식이다.**
    중단한다.
 3. 변환한다.
    - `scripts/migrate-evolution.py`가 있으면 **그것을 실행한다.**
+     인자 없이 실행하면 dry-run이라 아무것도 쓰지 않는다. 실제 변환은
+     `python3 scripts/migrate-evolution.py {VAULT}/evolution-state.md --write`로만 일어난다.
+     대상 경로를 생략하면 기본 vault를 잡으므로, 변환 대상이 맞는지 dry-run 출력의 `target:` 줄로 먼저 확인한다.
    - 없으면 사용자에게 알리고 인라인 변환(직접 읽어서 v3 스키마로 다시 쓰기)을 제안한다.
      승인 없이 인라인 변환을 강행하지 마라.
 4. 변환 후에도 **파일명 `evolution-state.md`는 그대로 유지한다.** 새 이름을 만들지 마라.

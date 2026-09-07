@@ -54,7 +54,8 @@ v2의 진화 상태는 YAML 헤더 없는 산문 형식이다. 읽기는 그대�
 
 - 변환 전 원본을 `evolution-state.v2.bak.md`로 백업한다.
 - 파일명 `evolution-state.md`는 그대로 유지한다.
-- 변환 스크립트: `scripts/migrate-evolution.py`
+- 변환 스크립트: `scripts/migrate-evolution.py`. 기본값은 dry-run이라 인자 없이 실행해도 파일이
+  바뀌지 않는다. 실제 쓰기는 `--write`가 있을 때만 일어난다.
 
 ## 쓰기 권한
 
