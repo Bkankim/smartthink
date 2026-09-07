@@ -8,7 +8,7 @@ v1 대비 강화 (뮤테이션 테스트로 무력화됐던 8계열 수리):
 - 토폴로지 핵심(background·SendMessage·Input 변수 10종·ADR-15/16·Step 5 폴백) 체크 신설
 - st-searcher 정의 <-> SKILL.md 폴백 브리핑 동기화(E), analysis-method 가드(F) 신설
 
-사용: python3 scripts/check-structure.py            (리포 내 skill/·agents/ 검사, 전 항목 PASS 시 exit 0)
+사용: python3 scripts/check-structure.py            (리포 내 skills/smartthink/·agents/ 검사, 전 항목 PASS 시 exit 0)
       python3 scripts/check-structure.py --installed (~/.claude/skills/smartthink·~/.claude/agents 검사)
       python3 scripts/check-structure.py <SKILL_DIR> <AGENTS_DIR>
 """
@@ -31,7 +31,7 @@ elif len(sys.argv) >= 3 and not sys.argv[1].startswith("-"):
     SKILL_DIR = Path(sys.argv[1]).expanduser().resolve()
     AGENTS_DIR = Path(sys.argv[2]).expanduser().resolve()
 else:
-    SKILL_DIR = REPO_ROOT / "skill"
+    SKILL_DIR = REPO_ROOT / "skills" / "smartthink"
     AGENTS_DIR = REPO_ROOT / "agents"
 
 SKILL_MD = SKILL_DIR / "SKILL.md"

@@ -1,0 +1,10 @@
+{
+  "name": "smartthink",
+  "version": "3.0.0-dev",
+  "description": "Context arming engine for Claude Code: routes your task through Cynefin diagnosis, loads only the mental-model references it needs (81 models, 12 engines, TRIZ), synthesizes task-specific research into an armory pack, and primes the session before you start working. Evolves per user via profile + evolution vault.",
+  "author": { "name": "Bkankim", "url": "https://github.com/Bkankim" },
+  "homepage": "https://github.com/Bkankim/smartthink",
+  "repository": "https://github.com/Bkankim/smartthink",
+  "license": "MIT",
+  "keywords": ["mental-models", "context-engineering", "thinking", "cynefin", "triz", "priming", "korean"]
+}

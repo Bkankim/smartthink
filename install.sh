@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
-SKILL_SOURCE="$SCRIPT_DIR/skill"
+SKILL_SOURCE="$SCRIPT_DIR/skills/smartthink"
 AGENTS_SOURCE="$SCRIPT_DIR/agents"
 SKILL_TARGET="$HOME/.claude/skills/smartthink"
 AGENTS_TARGET="$HOME/.claude/agents"
