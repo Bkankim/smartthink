@@ -111,12 +111,7 @@ THINKER_SYNC_RULES = (
 # promotes every one of these to FAIL in the meantime.
 PENDING_PATHS = frozenset(
     {
-        "skills/smartthink/references/lifecycle.md",  # W6 lifecycle procedures
-        "scripts/migrate-evolution.py",  # W5b migration script
-        "docs/ARCHITECTURE.md",  # W8a public architecture doc
-        "README.md",  # W8a, still carries v2 prose
-        "README.ko.md",  # W8a, still carries v2 prose
-        "CONTRIBUTING.md",  # W8a, still carries v2 prose
+        "scripts/migrate-evolution.py",  # evolution-state v2 to v3 migration, not written yet
     }
 )
 
