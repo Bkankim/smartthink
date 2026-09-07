@@ -1,0 +1,66 @@
+{
+  "generated": "2026-09-07T14:09:50.259792Z",
+  "modules": {
+    "anti-fragile-strategy.md": {
+      "bytes": 43271,
+      "est_tokens": 19669,
+      "sha256": "9e4a61f87950b48bf0d4ce1c19320552640a9d35330bc3566826b47df988b539",
+      "title": "안티프래질 전략 레퍼런스 (Antifragile Strategy Reference)"
+    },
+    "cognitive-arsenal.md": {
+      "bytes": 94741,
+      "est_tokens": 43064,
+      "sha256": "e672f1e8f3a73922720bce56259c3e89fa533c872c886494dbf684dd300e11b7",
+      "title": "인지 무기고 (Cognitive Arsenal)"
+    },
+    "core-engines.md": {
+      "bytes": 66988,
+      "est_tokens": 30449,
+      "sha256": "ba48889fef9d315e807376d517eee8ca370ca7e0234202cde991dfbf6e80899f",
+      "title": "천재적 사고 운영 엔진 (Core Thinking Engines)"
+    },
+    "execution-velocity.md": {
+      "bytes": 26182,
+      "est_tokens": 11901,
+      "sha256": "0e2ab5e728fbb8d524c22074803c2d94e823b97d92cedfcab5a6e93348787920",
+      "title": "실행 속도 (Execution Velocity)"
+    },
+    "meta-cognition.md": {
+      "bytes": 54326,
+      "est_tokens": 24694,
+      "sha256": "508d7700b4f0a65541f587bee9a830989a57eb18099194feb1792e4b7dc30452",
+      "title": "재귀적 메타인지 시스템 (Recursive Meta-Cognition System)"
+    },
+    "pattern-synthesis.md": {
+      "bytes": 36922,
+      "est_tokens": 16783,
+      "sha256": "ee3b6272fdc579156c84d4d3d18f34721c370e0277f0aa8cba7c36b23fd83fdd",
+      "title": "패턴 합성 시스템 (Pattern Synthesis System)"
+    },
+    "reality-distortion.md": {
+      "bytes": 37908,
+      "est_tokens": 17231,
+      "sha256": "010b9085d8522487c9ad773296abe64af8f572ece611fda584b906b17983a9bf",
+      "title": "현실 왜곡 프레임워크 (Reality Distortion Framework)"
+    },
+    "triz-innovation.md": {
+      "bytes": 48422,
+      "est_tokens": 22010,
+      "sha256": "2008dfbe04de033f8dd4b18ce72cc7976027dbfca9081da584788e16e717ef7b",
+      "title": "TRIZ 체계적 혁신 엔진 (TRIZ Systematic Innovation Engine)"
+    },
+    "unicorn-playbook.md": {
+      "bytes": 46437,
+      "est_tokens": 21108,
+      "sha256": "5496f8ae759b4318ebfac6af0fd1260c2ff682d7383be92ad34023ec0a55e2cc",
+      "title": "유니콘 플레이북 (Unicorn Playbook)"
+    }
+  },
+  "schema": 1,
+  "token_divisor": 2.2,
+  "totals": {
+    "bytes": 455197,
+    "count": 9,
+    "est_tokens": 206909
+  }
+}
