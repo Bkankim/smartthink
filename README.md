@@ -2,15 +2,60 @@ English | [한국어](README.ko.md)
 
 # SmartThink
 
-**천재적 사고 엔진 시스템** - A genius-level thinking engine for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).
+**A context arming engine for [Claude Code](https://docs.anthropic.com/en/docs/claude-code).**
 
-SmartThink combines 9 thinking frameworks (81 mental models, 12 operating engines, TRIZ innovation principles, antifragile strategy, and more) with Cynefin-based situation diagnosis to deliver deep, creative analysis on any topic. It is a skill plus two dedicated sub-agents: the analysis body runs in its own context, and a search scout feeds it real-world data.
+SmartThink does not answer your question. It builds the session that will.
+
+Before you start the real work, it deliberately spends tokens to turn the session into a specialist
+for that specific task. This is not fine-tuning. It is in-context arming, and it lives only inside
+the session. When it is done it prints a briefing and ends its turn, and you give the work order.
+
+```
+/st 사내 문서 검색 도구를 새로 만들지 기존 것을 개선할지 결정
+```
 
 ---
 
-## Quick Start
+## Why this is different
 
-### 1. Install
+Most thinking-framework tools hand you a summary. SmartThink loads the **verbatim source**.
+
+- **Verbatim, not summarized.** The selected reference modules go into the pack without a single
+  character changed, and a SHA-256 contract proves it. On top of that text sits a task-fitted
+  application layer and a research synthesis. A pack is the source, amplified, not compressed.
+- **Routed, not everything.** The nine reference modules total roughly 200K tokens. Loading them
+  all is not arming, it is drowning. A Cynefin diagnosis and a classification tree pick five
+  candidates and star three, and you approve the selection at a gate before anything is read.
+- **Research after arming.** References are read first, so the search queries are written by
+  something that already knows which frames it is feeding. Raw pages are digested inside the
+  sub-agent window, never in yours.
+- **The turn ends at the briefing.** Arming is preparation, not a conclusion. Ending there is the
+  last cheap moment for you to change direction.
+
+---
+
+## Install
+
+The plugin is the canonical path.
+
+```bash
+# from a marketplace
+/plugin marketplace add Bkankim/bkankim-plugins
+/plugin install smartthink
+
+# or straight from a local clone
+git clone https://github.com/Bkankim/smartthink.git
+claude --plugin-dir ./smartthink
+```
+
+> **Check the invocation name after installing.** Depending on your Claude Code version and how the
+> plugin was loaded, the skill may appear as `/smartthink` or under a namespaced form. Run `/skills`
+> and use whatever name is listed there. We are not going to guess it for you.
+
+### Alternative: `install.sh`
+
+If you would rather not use the plugin system, or you specifically want the short `/st` command
+without a namespace, use the installer. It symlinks into `~/.claude/`:
 
 ```bash
 git clone https://github.com/Bkankim/smartthink.git
@@ -18,159 +63,230 @@ cd smartthink
 ./install.sh
 ```
 
-The installer creates three symlinks (`~/.claude/skills/smartthink`, `~/.claude/agents/st-thinker.md`, `~/.claude/agents/st-searcher.md`) and seeds an empty evolution vault at `~/.claude/smartthink-vault/`.
+It installs one skill (`smartthink`), two agent definitions (`st-thinker`, `st-armorer`), and the
+`/st` command alias, then seeds an empty vault at `~/.claude/smartthink-vault/`
+(override with `SMARTTHINK_VAULT`). Upgrading from v2 also clears the symlink to the agent
+definition that v3 deleted.
 
-### 2. Open a new Claude Code session
-
-```bash
-claude
-```
-
-> **Important**: Start a **new** session after installation. Existing sessions won't recognize the skill or the agents.
-
-### 3. Try it
-
-```
-/smartthink 1인 기업의 확장 전략
-```
-
-`/st` works as a short alias. SmartThink diagnoses your topic, picks the best frameworks, gathers search data, and returns a full analysis with 6-10 actionable ideas.
+**Start a new Claude Code session afterwards.** Existing sessions do not pick up new skills or agents.
 
 ---
 
-## Three Modes
+## Usage
 
-| Flag | Mode | Where it runs | Interaction |
-|------|------|---------------|-------------|
-| (none) | **Agent** (default) | `st-thinker` sub-agent | none during analysis, feedback loop after |
-| `--deep` | **Deep** | main agent | checkpoints at every decision point |
-| `--lite` / `--light` | **Light** | main agent, no reference modules | none |
+### Subcommands
 
-`--nosearch` skips web search in any mode. Web search is **on by default** in every mode.
+Recognized only when the **first token matches exactly**. `/st status page redesign` is a topic,
+not the `status` subcommand.
 
-### Agent Analysis (default)
+| Subcommand | What it does |
+|---|---|
+| `/st init` | Local scan plus a short six-question interview, imprints your profile. Idempotent: an existing profile goes into update mode |
+| `/st retain` | Infers from the session which frames actually changed your mind, proposes routing, insight and profile deltas, writes only what you approve |
+| `/st status` | Profile summary, recent packs, evolution counts, environment diagnosis. Read-only |
 
-The whole analysis is delegated to the `st-thinker` sub-agent (STSA). It loads the reference modules into its own context, so your main session stays lean. After it returns, the agent stays alive in the background: give feedback and it revises in place, say "확정" (confirm) and it writes the final insights to the evolution vault.
+### Flags
 
-```
-/smartthink AI 스타트업에서 네트워크 효과를 만드는 방법
-```
+| Flag | What it does | When it earns its keep |
+|---|---|---|
+| `--digest` | Replaces the verbatim reference section with per-module distillations, 10-20K total | The frames matter but you cannot spare 100K of context for this task |
+| `--report` | Feeds the pack to `st-thinker`, which writes an analysis report instead | You want the conclusion written for you, not the session armed |
+| `--lite` | Cynefin plus first-principles analysis in context. No references, no pack, no gate | A quick read on a topic, or a harness where sub-agents are unavailable |
+| `--nosearch` | Skips research; pack section 3 is omitted | The domain is one you already know, or the network is not worth the wait |
+| `--budget N` | Caps the gate at N tokens and applies the trimming order | You know exactly how much context the rest of the session needs |
+| `--pack <path>` | Reloads an existing pack and skips the gate | A new session on work you already armed for once |
 
-### Deep Analysis
-
-The main agent runs the analysis itself and checks in with you at each interaction point: Cynefin boundary, module selection, and the search data pack before the heavy reference load.
-
-```
-/smartthink --deep 1인 기업의 수익 모델 설계
-```
-
-### Light Analysis
-
-Quick analysis using only Cynefin diagnosis plus first-principles decomposition, no reference modules loaded. Still runs the search scout unless `--nosearch` is given.
-
-```
-/smartthink --lite 사이드 프로젝트 아이디어
-/smartthink --lite --nosearch 사이드 프로젝트 아이디어
-```
-
-Legacy prefixes (`agent <topic>`, `light <topic>`, `search <topic>`) are still accepted as aliases, but `--` flags are the canonical form.
+**The topic is whatever text remains** after the subcommand and flags are stripped. Legacy prefixes
+(`agent`, `light`, `search`) were removed in v3 and are now read as part of the topic.
 
 ---
 
-## What Happens Behind the Scenes
+## How a run goes
 
 ```
-You type: /smartthink [--deep|--lite] [--nosearch] 주제
-         ↓
-    ┌─────────────────────────────────────┐
-    │  Main Agent                          │
-    │  1. Cynefin diagnosis                │
-    │  2. Topic classification + modules   │
-    │  3. Spawn st-searcher ──► data pack  │  (≤2K tokens, sources paired)
-    │  4. Mode branch                      │
-    └──────────┬──────────────────────────┘
-               ↓
-    ┌──────────┼──────────────┐
-    ▼          ▼              ▼
-  Agent       Deep          Light
-  st-thinker  main agent    main agent
-  (background (interactive) (no refs)
-   + feedback
-   loop)
+  capability detection      Agent tool available? -> armorer path, else inline path
+          |
+  profile + evolution       read from the vault, if they exist
+          |
+  Cynefin diagnosis         Clear domain? answer briefly and stop, no arming
+          |
+  module recommendation     5 candidates, 3 starred, routing weights applied
+          |
+  === GATE ===              interpretation, diagnosis, modules, estimated cost, research state
+          |                 you can adjust modules, set a budget, or turn research off
+  arming                    read references -> research -> synthesize -> write the pack
+          |
+  briefing                  section 1 of the pack, printed as written
+          |
+  turn ends                 you give the work order
 ```
 
-- **st-searcher** (Sonnet) digests raw search results in its own window and returns only a compact data pack: quantified table with sources, player list, trends plus at least one contrary signal, and source URLs. Raw pages never enter the main context.
-- **st-thinker** (inherits session model, 30-turn cap) runs the pipeline in `skill/references/analysis-method.md`: self-audit, module load, multi-layer analysis, cross-engine synthesis, idea generation, Top 3 with unicorn assessment, next steps.
+The **gate is the core UX of this tool.** It is the last cheap moment before an expensive commit,
+so it shows you the bill before you pay it:
+
+```
+━━ SmartThink 무장 게이트 ━━
+
+1. 입력 해석
+   사내 문서 검색 도구를 새로 만들지 기존 것을 개선할지 결정한다.
+   판단 대상은 빌드 대 개선이며, 성공 기준은 아직 미확정이다.
+
+2. 진단
+   Cynefin: Complicated  |  분류: 의사 결정
+
+3. 추천 모듈 (5개, ★ = 주력)
+   ★ 인지 무기고     - 매몰 비용과 가용성 편향이 "새로 짓자"를 부풀리는 지점을 짚는다
+   ★ 실행 속도       - 되돌릴 수 있는 결정과 없는 결정을 갈라 판단 속도를 정한다
+   ★ 안티프래질 전략 - 기존 개선을 기본값으로 두고 신규 구축을 작은 옵션으로 사는 바벨 배치
+     패턴 합성       - 같은 선택을 한 다른 팀들의 사후 신호를 찾는다
+     메타인지        - 이 결정이 실제로는 조직 문제인지 되짚는다
+
+4. 예상 비용 (추정치)
+   메인에 실릴 팩      ≈ 123K 토큰
+   서브에이전트 작업    ≈ 136K 토큰
+   ※ 두 값 모두 추정이며 실제와 다를 수 있습니다.
+
+5. 리서치: ON (기본)
+
+6. 조작
+   Enter    진행
+   숫자     예산 상한 지정 (예: 60000)
+   모듈 ±   추가·제거 (예: "메타인지 빼고 유니콘 플레이북 넣어")
+   --nosearch  리서치 끄기
+```
+
+Typing `60000` there trims in a fixed order: shrink research first, then drop whole low-priority
+modules, then compress the application layer. **A module is never cut in half.** Truncating source
+text turns the pack back into a summary, which is the one thing this tool exists to avoid.
+
+Running headless, the gate auto-proceeds under a 120K cap and reports what it trimmed.
 
 ---
 
-## Evolution System
+## What a pack is
 
-SmartThink learns from each session.
+A pack is a directory in your vault holding two files:
 
-- Effective thinking patterns are saved as **insights** (up to 10 slots)
-- Blind spots are tracked as **gaps** (up to 5 slots)
-- Module diversity is monitored so you don't over-rely on one framework
-- A self-audit step guards against the evolution state pre-deciding the conclusion
+```
+{VAULT}/packs/2026-03-14-team-onboarding-redesign/
+├── pack.md
+└── manifest.json
+```
 
-Evolution data lives **outside the repo** at `~/.claude/smartthink-vault/evolution-state.md` (override with `SMARTTHINK_VAULT`). Nothing personal is ever written into the cloned repo. The file `skill/.data/evolution-state.md` is only the empty template the installer seeds from.
+`pack.md` always has these six sections, in this order:
 
-In Agent mode the vault is updated only after you confirm the final version, so feedback-driven revisions never get stale insights recorded.
+| Section | Contents |
+|---|---|
+| 1. 무장 브리핑 | Active frames, the rules to follow for this task, relevant past insights, biases to watch, what to do next. 30-50 lines. This is what gets printed |
+| 2. 작업 해석 | The task restated. If you gave only a topic, three concrete candidate tasks instead |
+| 3. 리서치 합성 | Domain state, figures paired with sources, players, at least one contrary signal, source URLs. Omitted with `--nosearch` or when search is unavailable |
+| 4. 작업 적용 레이어 | Per module, 20-40 lines of "use this frame on this task like so", including conflicts between frames and which to follow when |
+| 5. 레퍼런스 원문 | The selected modules verbatim, wrapped in `MODULE-BEGIN` / `MODULE-END` markers carrying the source SHA-256 |
+| 6. 과거 인사이트와 프로필 | The insights and profile fields that actually bear on this task |
+
+`manifest.json` records the task, interpretation, Cynefin domain, classification, modules, budget,
+research flag, profile version, token estimates, creation time, and harness. Packs are kept 20 deep;
+past that SmartThink tells you which are oldest and lets **you** decide. It never deletes one, because
+`--pack` can reload it.
 
 ---
 
-## Thinking Modules
+## Evolution
 
-| Module | Key Frameworks |
-|--------|---------------|
-| Core Engines | First Principles, Asymmetric Opportunity, Network Effects, Market Creation, Moat Building, Contrarian Validation, Value Capture, Timing Intelligence, Compound Advantage, Ecosystem Design, Inversion, Lollapalooza Detection |
-| Unicorn Playbook | $0-to-$1B business building (6 phases) |
-| Reality Distortion | Constraint Inversion, Category Creation, Temporal Arbitrage |
-| Cognitive Arsenal | 81 mental models across 9 disciplines |
-| Pattern Synthesis | Cross-domain pattern recognition, Weak signal detection |
-| Execution Velocity | OODA Loop, Decision frameworks, Blitzscaling |
-| Antifragile Strategy | Barbell Strategy, Optionality, Black Swan positioning |
-| TRIZ Innovation | 40 Inventive Principles, Contradiction resolution |
-| Meta-Cognition | Recursive self-improvement, Wardley Mapping, User frame bias detection |
+SmartThink adapts to you across three layers.
 
-SmartThink selects 2-3 modules based on your topic type (idea discovery, strategy, problem solving, decision, systematic invention, and so on).
+| Layer | What it holds | Who writes it |
+|---|---|---|
+| Profile | Identity, current goals, style, defaults, sources, history summary | `/st init`, and you: it is meant to be hand-edited |
+| Routing weights, insights, gaps | Which modules actually work for which kind of thinking, plus insight and gap slots | `/st retain`, only what you approve |
+| Pack cache | Every pack ever built, reloadable with `--pack` | Each arming run |
+
+- **`/st init`** scans locally (project root instruction files, `~/.claude`, 50 git log entries, and
+  a notes directory if you name one), shows you what it inferred, asks six short questions you can
+  skip entirely, and writes the profile. It reads only; nothing is transmitted anywhere.
+- **`/st retain`** works out which frames actually changed a decision and which were loaded but
+  never mattered, then shows three separate proposals: routing weight deltas, insight and gap
+  changes, and profile deltas. Accept, reject, or edit each one independently. Nothing is written
+  without approval.
+- **`/st status`** prints the profile summary, the five most recent packs, evolution counts, and an
+  environment diagnosis with one line per problem on how to fix it. It writes nothing.
+
+All of it lives **outside the repository**, at `~/.claude/smartthink-vault/` by default, or wherever
+you point `SMARTTHINK_VAULT` or your profile. Your insights are never committed.
 
 ---
 
-## Repository Layout
+## Environment differences (graceful degradation)
 
-```
-skill/            the skill (SKILL.md + references/) - symlinked to ~/.claude/skills/smartthink
-agents/           st-thinker.md, st-searcher.md     - symlinked into ~/.claude/agents/
-scripts/          check-structure.py                - 66-point wiring check (skill <-> agents <-> prompt)
-install.sh        creates the symlinks and seeds the vault
-uninstall.sh      removes the symlinks, keeps the vault
-```
+Behavior in a degraded environment is fixed, not improvised.
 
-Run the structure check after editing anything under `skill/` or `agents/`:
+| Missing | Behavior |
+|---|---|
+| Agent tool (Codex and similar) | **Inline path**: the main session does the same work itself, with the same gate, the same pack spec, and the same vault. The only difference is that reference loading and research spend main context, and the gate says so |
+| `st-armorer` definition | Falls back to a general-purpose agent briefed with the full pack spec; failing that, the inline path |
+| `st-thinker` definition | `--report` falls back to a general-purpose agent driven by the bundled fallback prompt |
+| Search tools, or search fails | Pack section 3 is omitted, `manifest.research=false`, and the briefing says so. A missing tool is reported differently from a user-chosen `--nosearch` |
+| `insane-search` skill | Plain fetches only. Blocked sources are labeled "차단" and skipped rather than worked around |
+| Vault | Seeded on the spot. With no profile, the briefing points you at `/st init` |
+| v2-format evolution state | Read as-is. Converted on the first `retain`, with the original backed up |
+| `references/index.json` | Module sizes are measured directly and the gate marks the estimate as measured rather than precomputed |
+| Interactive terminal (headless) | The gate auto-proceeds under a 120K cap and reports what it trimmed |
 
-```bash
-python3 scripts/check-structure.py             # checks the repo copy
-python3 scripts/check-structure.py --installed # checks what Claude Code actually loads
-```
+---
+
+## Reference modules
+
+> **The nine reference modules are written in Korean.** They are loaded verbatim, so a pack's
+> section 5 is Korean regardless of your interface language. The synthesized parts (briefing,
+> interpretation, research, application layer) follow the language in your profile. If reading
+> Korean source text is a problem for you, this tool will not work well for you today. Translation
+> is a known gap, not a hidden one.
+
+| Module | Role |
+|---|---|
+| 핵심 엔진 (Core Engines) | The 12 operating engines: first principles, asymmetric opportunity, network effects, market creation, moat building, contrarian validation, value capture, timing, compound advantage, ecosystem design, inversion, lollapalooza |
+| 인지 무기고 (Cognitive Arsenal) | 81 mental models across nine domains, from physics and biology to game theory, psychology, and competitive advantage |
+| 유니콘 플레이북 (Unicorn Playbook) | Zero-to-$1B business building in six phases, with the antipatterns |
+| 현실 왜곡 (Reality Distortion) | Constraint inversion, category creation, temporal arbitrage, paradigm architecture, counterfactual thinking |
+| 패턴 합성 (Pattern Synthesis) | Cross-domain pattern recognition, convergence detection, anomaly mining, weak-signal detection |
+| 실행 속도 (Execution Velocity) | OODA loops, decision frameworks, judging when blitzscaling conditions actually hold |
+| 안티프래질 전략 (Antifragile Strategy) | Barbell strategy, optionality, convexity, black-swan positioning, reflexivity |
+| TRIZ 혁신 시스템 (TRIZ Innovation) | The 40 inventive principles, contradiction resolution, ideal final result, laws of technical evolution |
+| 메타인지 (Meta-Cognition) | Recursive self-improvement, Cynefin diagnosis, Wardley mapping, inversion, lollapalooza detection |
 
 ---
 
 ## Requirements
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI with custom agents support
-- macOS or Linux (Windows: use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/))
-- Optional: the `insane-search` skill for reaching sites that block plain fetches. Without it, `st-searcher` simply skips blocked sources.
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Sub-agent support gets you the
+  armorer path; without it you get the inline path, which produces the same pack.
+- Python 3 for `scripts/build-index.py` and `scripts/check-structure.py`. Neither is needed to
+  *use* SmartThink, only to develop it.
+- macOS or Linux for `install.sh` (on Windows use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/)).
+  The plugin route has no such restriction.
+- Optional: the `insane-search` skill, for sources that block plain fetches. Without it those
+  sources are skipped and labeled.
+- Codex and other non-Claude-Code harnesses are expected to work through the inline path, but that
+  is not yet verified.
 
-## Uninstallation
+---
+
+## Uninstall
 
 ```bash
 cd smartthink
 ./uninstall.sh
 ```
 
-Your evolution vault stays in place. Delete `~/.claude/smartthink-vault/` for a full reset.
+Symlinks go, the vault stays. Delete `~/.claude/smartthink-vault/` yourself for a full reset.
+
+---
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Design rationale lives in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); the release history is in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 
-MIT
+MIT. See [LICENSE](LICENSE).
