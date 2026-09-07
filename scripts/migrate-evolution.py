@@ -4,7 +4,8 @@
 The retain procedure invokes this tool immediately before its first v3 write.
 It backs up a legacy file before replacing it and leaves already-v3 files untouched.
 Legacy prose is preserved; only data promoted into the YAML header is removed.
-Use --dry-run to inspect the conversion without writing either file.
+Running without --write is a dry run: the conversion is reported and nothing is
+written. Pass --write to back up the original and convert it in place.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ import json
 import math
 import os
 import re
+import shlex
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -63,10 +65,13 @@ class Migration:
 
 
 def parse_arguments() -> argparse.Namespace:
-    # Parse the target path and non-destructive migration options.
-    parser = argparse.ArgumentParser(description="Convert a legacy evolution-state.md file to v3.")
+    # Parse the target path and the migration options; writing is opt-in.
+    parser = argparse.ArgumentParser(
+        description="Convert a legacy evolution-state.md file to v3. Without --write this is a dry run."
+    )
     parser.add_argument("path", nargs="?", type=Path, help="path to evolution-state.md")
-    parser.add_argument("--dry-run", action="store_true", help="print the conversion without writing")
+    parser.add_argument("--write", action="store_true", help="back up the original and convert it in place")
+    parser.add_argument("--dry-run", action="store_true", help="accepted for compatibility; a dry run is the default")
     parser.add_argument("--force", action="store_true", help="replace an existing v2 backup")
     return parser.parse_args()
 
@@ -226,6 +231,14 @@ def write_bytes(path: Path, content: bytes) -> None:
         raise
 
 
+def write_command(target: Path, backup_exists: bool) -> str:
+    # Build the exact command that performs the write this dry run only described.
+    parts = ["python3", "scripts/migrate-evolution.py", shlex.quote(str(target)), "--write"]
+    if backup_exists:
+        parts.append("--force")
+    return " ".join(parts)
+
+
 def report(target: Path, backup: Path, migration: Migration, dry_run: bool) -> None:
     # Print a human-readable account of recovered and unavailable legacy data.
     print(f"target: {target}")
@@ -242,8 +255,12 @@ def report(target: Path, backup: Path, migration: Migration, dry_run: bool) -> N
     if migration.insights > 10 or migration.gaps > 5:
         print(f"slot overflow preserved without deletion: insights={migration.insights}, gaps={migration.gaps}")
     if dry_run:
+        backup_exists = backup.exists()
+        if backup_exists:
+            print(f"warning: a backup already exists at {backup}; writing needs --force to replace it")
         print("dry-run: no files were written\n")
         print(migration.content, end="" if migration.content.endswith("\n") else "\n")
+        print(f"\nto write this conversion, run: {write_command(target, backup_exists)}")
 
 
 def main() -> int:
@@ -270,7 +287,7 @@ def main() -> int:
         print("error: no legacy evolution sections were parsed; original file was left unchanged", file=sys.stderr)
         return 1
     backup = target.with_name(BACKUP_NAME)
-    if arguments.dry_run:
+    if not arguments.write:
         report(target, backup, migration, True)
         return 0
     if backup.exists() and not arguments.force:

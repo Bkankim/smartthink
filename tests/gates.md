@@ -156,6 +156,7 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
   - 승인 뒤 원본 바이트가 `evolution-state.v2.bak.md`에 백업되고 비어 있지 않다.
   - 새 `evolution-state.md` 첫 줄은 `---`이고 헤더에 `version`, `updated`, `sessions`, `diversity_h`, `routing_weights`가 모두 있다.
   - 승인한 수정만 기록되고, 거부한 덩어리는 쓰지 않는다.
+  - `scripts/migrate-evolution.py`를 쓰는 경로라면 `--write`가 붙어 있다. 인자 없는 실행은 dry-run이라 변환되지 않고, 그 출력만 보고 변환됐다고 판정하면 실패다.
 - **증거**: `T7-transcript.md`, `T7-evolution.before.md`, `T7-evolution.after.md`, `T7-evolution-state.v2.bak.md`, `T7-evolution.diff`를 남긴다.
 - **실패 시 흔한 원인**: 승인 전에 기록함, 백업 없이 변환함, v3 헤더의 필수 키가 빠짐.
 
