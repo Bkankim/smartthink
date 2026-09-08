@@ -1,0 +1,13 @@
+{
+  "task": "공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘",
+  "interpretation": "공공 도서관 좌석·자료 예약의 대기열 안내(대기 순번·예상 시간·알림)를 개선하는 실행 계획 문서를 설계한다. 구간은 현황 진단 → 개선안 → 단계별 실행 → 검증이며, 산출물은 화면이 아니라 계획이다. 좌석/자료 우선순위, 대상 관 수, 벤더 변경 권한, 로그 데이터 존재 여부는 미확정.",
+  "cynefin": "Complicated",
+  "classification": "문제 해결",
+  "modules": ["핵심 엔진", "TRIZ 혁신 시스템"],
+  "budget": "60000",
+  "research": false,
+  "profile_version": "3",
+  "est_tokens": { "pack": 61190, "agent": 79123 },
+  "created": "2026-09-08T02:17:25+09:00",
+  "harness": "claude-code"
+}

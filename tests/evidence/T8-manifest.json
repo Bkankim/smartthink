@@ -1,0 +1,13 @@
+{
+  "task": "지역 박물관의 안내 표지 체계를 개선해줘",
+  "interpretation": "지역 공립·소규모 박물관의 외부 유도 사인, 내부 동선 사인, 전시실 안내판, 픽토그램·다국어(유니버설디자인) 층을 하나의 체계로 진단하고 개선 실행 계획을 만드는 문제 해결 작업. 성공 기준은 직원에게 길 묻는 횟수·결정점 오경로 감소이며, 대상 관 규모·예산·다국어 범위는 미확정.",
+  "cynefin": "Complicated",
+  "classification": "문제 해결",
+  "modules": ["핵심 엔진", "인지 무기고", "패턴 합성", "TRIZ 혁신 시스템", "실행 속도"],
+  "budget": null,
+  "research": true,
+  "profile_version": "3",
+  "est_tokens": { "pack": 140106, "agent": 139000 },
+  "created": "2026-09-07T17:57:56Z",
+  "harness": "claude-code (plugin-dir, general-purpose fallback)"
+}

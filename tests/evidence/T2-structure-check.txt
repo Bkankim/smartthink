@@ -1,0 +1,24 @@
+# T2 구조 검사
+
+## 1차 (증거 파일 복사 전, armorer 반환 직후 메인이 실행)
+$ python3 scripts/check-structure.py --pack [REDACTED]/smartthink-v3-gates-20260908-020434/packs/2026-09-08-library-queue-notice-plan
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+35 passed, 0 failed, 0 skipped
+exit code: 0
+
+## 2차 (tests/evidence/T2-pack.md 복사 후 재실행) - 부수 관찰
+$ python3 scripts/check-structure.py --pack <같은 경로>
+FAIL G. hygiene: no em dash in editable files: 96 em dash occurrence(s) in editable files; replace each with a hyphen
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+34 passed, 1 failed, 0 skipped
+exit code: 1
+
+관찰: G. hygiene 검사가 tests/evidence/*.md를 편집 가능 파일로 훑어 5절 원문(레퍼런스 자체의 em dash 96건)을 잡는다. H. pack 5항목은 계속 PASS. 팩 자체의 계약 위반이 아니라 증거 규약(원본 복사)과 hygiene 검사 범위의 충돌이다.

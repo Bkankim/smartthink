@@ -1,0 +1,17 @@
+# T8 복원 확인
+
+$ mv "${TMPDIR:-/tmp}/st-armorer.md.gates" agents/st-armorer.md
+$ ls agents/
+st-armorer.md
+st-thinker.md
+$ shasum -a 256 agents/st-armorer.md (이동 전 f737139dbe6f...)
+f737139dbe6f7bb53a9fde326e8aa2c8e0dd1200500bc83da40c05e7638ddce6
+$ git status --short agents/
+(빈 출력 = 추적 파일 무변경)
+$ python3 scripts/check-structure.py 2>&1 | grep 'st-armorer'
+PASS A. layout: st-armorer.md and st-thinker.md exist
+PASS C. agents: st-armorer effort/maxTurns
+PASS C. agents: st-armorer owns the web tools
+복원 시각: 2026-09-08T02:54:22+0900
+
+참고: 이동 상태에서 스폰된 두 에이전트(캐시된 smartthink:st-armorer, general-purpose 폴백)는 복원과 무관하게 계속 실행됨. 복원은 스폰 직후(02:53)에 수행.

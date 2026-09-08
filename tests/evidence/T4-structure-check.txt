@@ -1,0 +1,23 @@
+# T4 구조 검사
+
+$ python3 scripts/check-structure.py --pack [REDACTED]/smartthink-v3-gates-20260908-020434/packs/2026-09-08-event-volunteer-deployment-review
+FAIL G. hygiene: no em dash in editable files: 196 em dash occurrence(s) in editable files; replace each with a hyphen
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+FAIL H. pack: section 5 verbatim hash integrity: [REDACTED]/smartthink-v3-gates-20260908-020434/packs/2026-09-08-event-volunteer-deployment-review/pack.md: section 5 has no '<!-- MODULE-BEGIN: <file> sha256=<64 hex> -->' marker. Every module block must be wrapped so its verbatim copy can be hashed.
+PASS H. pack: module markers scoped to section 5
+33 passed, 2 failed, 0 skipped
+exit code: 1
+
+$ python3 scripts/check-structure.py --pack <같은 경로> --digest
+FAIL G. hygiene: no em dash in editable files: 196 em dash occurrence(s) in editable files; replace each with a hyphen
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+FAIL H. pack: section 5 verbatim hash integrity: [REDACTED]/smartthink-v3-gates-20260908-020434/packs/2026-09-08-event-volunteer-deployment-review/pack.md: --digest pack but section 5 has no '<!-- MODULE-DIGEST: <file> -->' marker
+PASS H. pack: module markers scoped to section 5
+33 passed, 2 failed, 0 skipped
+exit code: 1
+
+참고: G. hygiene FAIL은 tests/evidence/T2·T3-pack.md(레퍼런스 원문의 em dash)가 원인이며 이 팩과 무관. H. 5절 FAIL이 T4 판정 근거.

@@ -243,26 +243,26 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 
 | 질문 | 답이 나오는 게이트 | 결과 기입란 |
 |---|---:|---|
-| `plugin.json`에 agents 등록 필드가 필요한가 | T11 | |
-| `/smartthink` 단축 호출이 되는가, 아니면 네임스페이스가 붙는가 | T11 | |
-| 백그라운드 Write에서 권한 프롬프트가 뜨는가 | T9 | |
-| SendMessage 재개가 동작하는가 | T10 | |
-| 헤드리스에서 게이트 자동 진행이 되는가 | T12 | |
+| `plugin.json`에 agents 등록 필드가 필요한가 | T11 | **불필요**. plugin.json에 agents/commands/skills 필드 없이 `agents/`·`commands/`·`skills/`가 루트 자동 인식됨. 등록 이름은 `smartthink:st-armorer`, `smartthink:st-thinker`, `smartthink:st`, `smartthink:smartthink` (2026-09-08, Claude Code 2.1.263, `--plugin-dir .`) |
+| `/smartthink` 단축 호출이 되는가, 아니면 네임스페이스가 붙는가 | T11 | **네임스페이스 필수: `/smartthink:smartthink`만 v3를 연다.** bare `/smartthink`·`/st`·플러그인 별칭 `/smartthink:st`는 모두 이 머신의 전역 v2(`~/.claude/skills/smartthink`, `~/.claude/commands/st.md`)로 해석됨(Base directory 실측). 에이전트도 bare `st-armorer`는 not found, bare `st-thinker`는 전역 v2 정의를 가리킴 |
+| 백그라운드 Write에서 권한 프롬프트가 뜨는가 | T9 | **관찰 불가(bypass permissions 모드 세션)**. 규칙 없음/있음 두 시도 모두 프롬프트 없이 Write 성공. 일반 권한 모드 세션에서 재실측 필요. 규칙 설치 머지 자체는 정상(allow 배열 신설 + `Edit(<VAULT>/**)` 1개) |
+| SendMessage 재개가 동작하는가 | T10 | **동작함**(T5·T10). 첫 보고서 후 SendMessage → `Resuming agent <같은 id>`로 같은 thinker가 in-context 개정본 반환, 확정 신호도 같은 경로로 전달돼 Step 5 실행. 재스폰 없음 |
+| 헤드리스에서 게이트 자동 진행이 되는가 | T12 | **됨**. `claude -p`가 Enter 대기 없이 게이트 자동 진행, `--budget 200000`을 무시하고 120K 상한 적용(manifest.budget "120000"), 절삭 내역 출력, 팩·브리핑·턴 종료. 단 중첩 자식 프로세스는 `CLAUDE_CODE_OAUTH_TOKEN`이 없으면 "Not logged in"(문서 원문 명령은 exit 1) |
 
 ## 5. 결과 요약
 
 | 게이트 번호 | 판정 | 실행일 | 증거 파일 | 비고 |
 |---:|---|---|---|---|
-| T1 | | | | |
-| T2 | | | | |
-| T3 | | | | |
-| T4 | | | | |
-| T5 | | | | |
-| T6 | | | | |
-| T7 | | | | |
-| T8 | | | | |
-| T9 | | | | |
-| T10 | | | | |
-| T11 | | | | |
-| T12 | | | | |
-| T13 | | | | |
+| T1 | PASS | 2026-09-08 | T1-profile.md, T1-transcript.md | 스캔→확인→인터뷰→최종 승인→쓰기 순서 준수. version 3·ISO updated·6블록. 테스터(모델)가 인터뷰 답을 인라인 공급 |
+| T2 | FAIL | 2026-09-08 | T2-manifest.json, T2-pack.md, T2-transcript.md, T2-structure-check.txt, T2-failure.md | `--budget 60000` 절삭 순서가 리서치를 먼저 끄고 되돌리지 않아 3절 부재(5/6 절). 나머지 기준(게이트·비용 2단위·manifest 11필드·해시 exit 0·턴 종료) 충족. bare `st-armorer` not found → `smartthink:st-armorer` |
+| T3 | PASS | 2026-09-08 | T3-pack.md, T3-transcript.md | 게이트 1항목에 예상 작업 A/B/C, Enter 진행 후 팩 2절에 셋 모두 구체 작업으로 보존. 리서치 출처 27 |
+| T4 | FAIL | 2026-09-08 | T4-manifest.json, T4-pack.md, T4-transcript.md, T4-structure-check.txt, T4-failure.md | MODULE-DIGEST 마커 0개(armorer 정의에 규격 없음), est_tokens.pack 32002 > 20000, 1절에 증류본 명시 없음. check --pack/--digest 모두 exit 1 |
+| T5 | PASS | 2026-09-08 | T5-evolution.before.md, T5-evolution.preconfirm.md, T5-evolution.after.md, T5-evolution.diff, T5-transcript.md | Pack Path 입력·보고서 그대로 표시·확정 전 cmp 0·SendMessage 동일 thinker 재개·확정 후 Step 5(sessions 0→1, 5키 유지) |
+| T6 | PASS | 2026-09-08 | T6-transcript.md, T6-briefing-source.md | 게이트 미표시, 1절 바이트 동일 출력, 신규 팩 없음. 사전 조건 편차: T2 FAIL이나 구조 검사 exit 0 팩 사용 |
+| T7 | PASS | 2026-09-08 | T7-transcript.md, T7-evolution.before.md, T7-evolution.after.md, T7-evolution-state.v2.bak.md, T7-evolution.diff | 승인 전 원문 유지·.bak 부재, 승인 후 백업·`--write`·v3 헤더 5키, 거부 덩어리 미기록. 관찰: lifecycle 수동 백업 후 스크립트가 'backup exists' exit 1(`--force` 필요) |
+| T8 | PASS | 2026-09-08 | T8-transcript.md, T8-manifest.json, T8-pack.md, T8-restore-check.txt | 조건부. 하네스가 에이전트 목록을 세션 시작 시 캐시해 정의 제거가 런타임 스폰 실패로 이어지지 않음. general-purpose 폴백은 테스터가 강제 실행 → 6절·해시 계약 통과. 정의 복원 sha 동일 |
+| T9 | PASS | 2026-09-08 | T9-settings.diff, T9-transcript.md, T9-prompt-observation.md | 조건부. 거절 시 settings 무변경, 승인 시 보존 머지로 `Edit(<VAULT>/**)` 1개 추가. 프롬프트 발생 여부는 bypass 모드라 관찰 불가 |
+| T10 | PASS | 2026-09-08 | T10-transcript.md, T10-evolution.before.md, T10-evolution.after.md, T10-fallback-transcript.md, T10-fallback-evolution.diff | 피드백 SendMessage 동일 thinker 재개(도구 0회 in-context 개정), 확정 전 무변경, 확정 후 thinker Step 5(sessions 1→2). 폴백: 재개 직후 TaskStop으로 종료시킨 뒤 메인이 Step 5 직접 실행(sessions 2→3). 유휴 thinker는 TaskStop 불가·SendMessage 재개 가능 |
+| T11 | PASS | 2026-09-08 | T11-skills.txt, T11-transcript.md, T11-observation.md | 실제 호출 이름 `/smartthink:smartthink`. `/st`·`/smartthink`·`/smartthink:st`는 전역 v2로 감. agents 등록 필드 불필요 |
+| T12 | PASS | 2026-09-08 | T12-output.txt, T12-manifest.json, T12-pack.md | run1(문서 원문)은 Not logged in exit 1(중첩 자식 인증). run2(`CLAUDE_CODE_OAUTH_TOKEN` 주입)에서 자동 진행·120K 상한·절삭 출력·턴 종료. 헤드리스도 `/st`가 v2를 먼저 열고 스스로 v3 재호출 |
+| T13 | BLOCKED | 2026-09-08 | T13-blocked.md | codex exec에서 `/smartthink` 미등록(자유 텍스트로 처리). cwd가 리포라 SKILL.md를 읽어 게이트만 출력, 인라인 안내문 없음, 팩 없음 |

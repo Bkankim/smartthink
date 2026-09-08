@@ -1,0 +1,23 @@
+# T11 - 세션에 로딩된 스킬·에이전트 목록 (원문 발췌)
+
+실행 세션: `claude --plugin-dir .` (리포 루트, 브랜치 v3), Claude Code 2.1.263, 2026-09-08 02:0x~
+주의: 테스터가 모델이므로 `/skills` TUI 화면 대신, 세션 시스템 프롬프트가 모델에 제공한 "Available skills" 목록과
+Agent 도구 오류 메시지가 돌려준 "Available agents" 목록을 그대로 옮겼다. SmartThink 관련 항목만 발췌.
+
+## Available skills (Skill 도구 목록) - smartthink 관련 4건
+
+- smartthink: ALWAYS use this skill for business strategy, competitive analysis, or complex decisions — it has 81 mental models, 12 thinking engines, and TRIZ innovation frameworks ... This is NOT a simple Q&A — it deploys Cynefin diagnosis + multi-framework analysis in 3 modes (Light/Deep/Agent).
+    ← 전역 v2 (~/.claude/skills/smartthink/SKILL.md). "3 modes (Light/Deep/Agent)"가 v2 표식.
+- st: Alias for /smartthink. Invoke Skill tool: `Skill("smartthink", "$ARGUMENTS")`
+    ← 전역 v2 별칭 (~/.claude/commands/st.md)
+- smartthink:st: SmartThink alias. Same as /smartthink.
+    ← 플러그인 commands/st.md (네임스페이스 smartthink:)
+- smartthink:smartthink: ALWAYS use this skill before business strategy, competitive analysis, or complex decisions - it arms the session with 81 mental models, 12 thinking engines, and TRIZ frameworks ... It does not answer the question: it builds an armory pack ... Lifecycle subcommands: "/st init" (profile), "/st retain" (evolution), "/st status" (diagnostics).
+    ← 플러그인 skills/smartthink/SKILL.md (v3)
+
+## Available agents (Agent 도구 오류 메시지 원문, T2에서 실측)
+
+Agent type 'st-armorer' not found. Available agents: ai-tell-detector, claude, claude-code-guide, content-fidelity-auditor, Explore, general-purpose, humanize-monolith, humanize-web-architect, korean-ai-tell-taxonomist, korean-style-rewriter, korean-translation-scholar, naturalness-reviewer, Plan, post-editese-metric-engineer, quick-rules-integrator, smartthink:st-armorer, smartthink:st-thinker, st-searcher, st-thinker, statusline-setup, taxonomy-gap-analyzer, translationese-research-distiller
+
+- smartthink:st-armorer, smartthink:st-thinker ← 플러그인 agents/ (plugin.json에 agents 필드 없이 자동 인식)
+- st-searcher, st-thinker (bare) ← 전역 v2 (~/.claude/agents/st-searcher.md, st-thinker.md, 2026-07-22)
