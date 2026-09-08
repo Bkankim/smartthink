@@ -1,0 +1,22 @@
+# T9 settings.json 전후 diff (permissions.allow 관련만, 무관 설정은 [REDACTED])
+
+before = ~/.claude/settings.json.pre-gates.bak (02:04 백업, 1차 init 거절 후에도 cmp 동일)
+after  = ~/.claude/settings.json (2차 init에서 규칙 설치 승인 후, 2026-09-08T03:00:37+0900)
+
+```diff
+@@ -15,7 +15,10 @@
+       "Read(~/.config/gh/hosts.yml)",
+       "Read(~/Library/Keychains/**)"
+     ],
+-    "defaultMode": "auto"
++    "defaultMode": "auto",
++    "allow": [
++      "Edit([REDACTED]/smartthink-v3-gates-t9-20260908-025000/**)"
++    ]
+   },
+   "model": "claude-fable-5-1",
+   "skillOverrides": {
+```
+
+의미 diff(정렬 JSON 비교): permissions.allow 배열 신설 + 항목 1개 추가만 있고 다른 키·항목 변경 0건. 기존에 allow 키가 없어 배열을 새로 만들었다(덮어쓰기 아님).
+설치 규칙: Edit([REDACTED]/smartthink-v3-gates-t9-20260908-025000/**) - 현재 vault를 정확히 가리킴, 1개.
