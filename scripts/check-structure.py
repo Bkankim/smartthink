@@ -700,6 +700,29 @@ def check_manifest_fields_shared() -> Result:
     return ok(f"all {len(MANIFEST_FIELDS)} manifest fields mentioned in SKILL.md and st-armorer.md")
 
 
+def plugin_namespace() -> str:
+    """The prefix a plugin install registers skills and agents under: plugin.json name.
+
+    plugin.json is the SSOT; check_plugin_json validates it separately. If it is
+    unreadable this falls back to the directory contract so the namespace checks below
+    still report something specific rather than crashing on a second file's problem.
+    """
+    try:
+        data = json.loads(PLUGIN_JSON.read_text(encoding="utf-8"))
+        name = data.get("name")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    except (OSError, ValueError):
+        pass
+    return "smartthink"
+
+
+def strip_plugin_namespace(name: str) -> str:
+    """'smartthink:st-armorer' names the same definition file as 'st-armorer'."""
+    prefix = f"{plugin_namespace()}:"
+    return name[len(prefix) :] if name.startswith(prefix) else name
+
+
 def check_spawned_agents_exist() -> Result:
     text = read_text(SKILL_MD)
     if text is None:
@@ -715,7 +738,10 @@ def check_spawned_agents_exist() -> Result:
         if name == "general-purpose":
             evidence.append("general-purpose (built-in fallback, no definition file needed)")
             continue
-        definition = AGENTS_DIR / f"{name}.md"
+        # A plugin session registers agents/<bare>.md as "<plugin>:<bare>". Both spellings
+        # resolve to the same file, so the prefix comes off before the existence check.
+        bare = strip_plugin_namespace(name)
+        definition = AGENTS_DIR / f"{bare}.md"
         if not definition.exists():
             problems.append(
                 f"{rel(SKILL_MD)}:{line_of(text, match.start())} spawns {name!r} but "
@@ -728,6 +754,77 @@ def check_spawned_agents_exist() -> Result:
     if problems:
         return bad("SKILL.md spawns an agent with no definition", problems)
     return ok(f"all {len(seen)} spawned sub-agent names resolve", evidence)
+
+
+def check_namespaced_invocation() -> Result:
+    """Plugin-registered names carry the plugin prefix, and the fallback is written down.
+
+    A bare `subagent_type` is not a harmless shorthand: in a plugin session
+    `st-armorer` is not found (so the skill wrongly concludes the definition is
+    missing and drops to general-purpose), and `st-thinker` silently resolves to a
+    same-named user-level definition. Both were measured in gate T2/T11. The prefixed
+    name is therefore the canonical spelling, and the one-shot bare-name retry that
+    covers non-plugin installs has to be stated in prose, not assumed.
+    """
+    prefix = f"{plugin_namespace()}:"
+    text = read_text(SKILL_MD)
+    if text is None:
+        return bad(f"{rel(SKILL_MD)} is missing or unreadable")
+
+    problems: list[str] = []
+    evidence: list[str] = []
+
+    unprefixed: list[str] = []
+    prefixed = 0
+    for match in re.finditer(r'subagent_type:\s*"([^"]+)"', text):
+        name = match.group(1)
+        if name == "general-purpose":
+            continue
+        if name.startswith(prefix):
+            prefixed += 1
+        else:
+            unprefixed.append(f"{rel(SKILL_MD)}:{line_of(text, match.start())} spawns {name!r}")
+    if unprefixed:
+        problems.append(
+            f"subagent_type must be written as {prefix}<name> so a plugin session resolves it: "
+            + "; ".join(unprefixed)
+        )
+    else:
+        evidence.append(f"{prefixed} prefixed subagent_type spawn(s) in {rel(SKILL_MD)}")
+
+    # The retry rule keeps non-plugin installs (install.sh symlinks into ~/.claude/agents)
+    # working, so the prefixed name alone is not the whole contract.
+    retry_rule = None
+    for number, line in enumerate(text.splitlines(), start=1):
+        if "bare" in line and re.search(r"1\s*회", line) and "재시도" in line:
+            retry_rule = number
+            break
+    if retry_rule is None:
+        problems.append(
+            f"{rel(SKILL_MD)} states no one-shot bare-name retry rule; a non-plugin install "
+            "registers the bare name only and would fall through to general-purpose"
+        )
+    else:
+        evidence.append(f"{rel(SKILL_MD)}:{retry_rule} bare-name retry rule")
+
+    # The /st alias is the other half of the same collision: a bare `smartthink` call
+    # from a plugin command leaks to whatever else owns that name (gate T11).
+    command_md = REPO_ROOT / "commands" / "st.md"
+    command_text = read_text(command_md)
+    if command_text is None:
+        problems.append(f"{rel(command_md)} is missing or unreadable")
+    elif f"{prefix}{plugin_namespace()}" not in command_text:
+        problems.append(
+            f"{rel(command_md)} does not invoke {prefix}{plugin_namespace()}; the alias would "
+            "resolve to whatever else owns the bare skill name"
+        )
+    else:
+        hits = find_lines(command_text, f"{prefix}{plugin_namespace()}")
+        evidence.append(f"{rel(command_md)}:{hits[0]} invokes {prefix}{plugin_namespace()}")
+
+    if problems:
+        return bad(f"{len(problems)} namespace wiring problem(s)", problems)
+    return ok("plugin namespace on spawns and on the /st alias", evidence)
 
 
 def check_referenced_reference_files() -> Result:
@@ -1438,6 +1535,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("D", "wiring: 6 pack section titles shared verbatim", check_pack_section_titles),
     ("D", "wiring: 11 manifest fields described on both sides", check_manifest_fields_shared),
     ("D", "wiring: spawned sub-agent names resolve to agents/", check_spawned_agents_exist),
+    ("D", "wiring: plugin namespace on spawns and the /st alias", check_namespaced_invocation),
     ("D", "wiring: referenced references/ files exist", check_referenced_reference_files),
     ("D", "wiring: st-thinker definition and fallback prompt in sync", check_thinker_prompt_sync),
     ("D", "wiring: thinker-prompt substitution variables", check_thinker_prompt_variables),
