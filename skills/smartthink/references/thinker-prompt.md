@@ -1,6 +1,7 @@
 # SmartThink `--report` 폴백 프롬프트 (thinker-prompt)
 
-> **용도**: `st-thinker` 에이전트 정의가 없는 환경에서 `--report` 경로를 살리기 위한 폴백 SSOT.
+> **용도**: `smartthink:st-thinker`(접두어 없는 설치에서는 bare `st-thinker`) 에이전트 정의가
+> 어느 이름으로도 해석되지 않는 환경에서 `--report` 경로를 살리기 위한 폴백 SSOT.
 > SKILL.md가 이 파일을 Read하고, 아래 치환 변수를 채운 뒤, Agent 도구의 `prompt` 파라미터로
 > `subagent_type: "general-purpose"`에 전달한다.
 >

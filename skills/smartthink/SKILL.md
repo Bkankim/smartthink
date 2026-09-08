@@ -65,7 +65,7 @@ description: >
 | 플래그 | 동작 |
 |---|---|
 | `--digest` | 팩 5절(레퍼런스 원문)을 모듈별 증류본으로 대체. 총 10~20K 목표 |
-| `--report` | 팩을 입력으로 `st-thinker`가 분석 보고서 작성. 보고서만 표시, 팩은 파일로만 |
+| `--report` | 팩을 입력으로 `smartthink:st-thinker`가 분석 보고서 작성. 보고서만 표시, 팩은 파일로만 |
 | `--lite` | 레퍼런스·팩 없이 Cynefin + 제1원리 인컨텍스트 분석 |
 | `--nosearch` | 리서치 생략. 팩 3절 생략 |
 | `--budget N` | 게이트 상한을 N토큰으로 고정하고 절삭 규칙 적용 |
@@ -311,12 +311,18 @@ Agent 도구가 있으면 이 경로다.
 
 ```
 Agent(
-  subagent_type: "st-armorer",
+  subagent_type: "smartthink:st-armorer",
   description: "SmartThink 무장 팩 생성",
   run_in_background: false,     // 동기. 팩이 완성돼야 6단계로 갈 수 있다
   prompt: <아래 Input 블록>
 )
 ```
+
+### 에이전트 이름 해석 규칙
+
+**이 스킬이 스폰하는 에이전트 이름은 `smartthink:` 접두어가 붙은 것이 정본이다**(플러그인으로 로딩되면 `agents/`의 정의는 그 이름으로만 등록된다). `smartthink:<이름>`이 not found면 bare `<이름>`으로 **1회만** 재시도하고, 그래도 실패해야 `general-purpose` 폴백으로 내려가라. 접두어 없는 설치(install.sh 심링크처럼 `~/.claude/agents/`에 놓는 사용자 레벨 설치)에서는 bare 이름이 정본이기 때문이다.
+
+> **bare 재시도가 뜬 에이전트가 이 정의라는 보장은 없다.** 같은 파일명의 구버전이 사용자 레벨에 남아 있으면 오류 없이 그것이 스폰된다. 재시도로 받은 반환이 아래 반환 규약을 어기면(팩 파일 부재, 절 구조 불일치) 정의가 다른 것으로 보고 `general-purpose` 폴백으로 내려가라.
 
 - **clean 스폰이다. fork 금지** - armorer는 빈 창에서 레퍼런스 원문을 로딩해야 한다. 메인 컨텍스트를 물려받으면 무장 비용을 절감하는 목적 자체가 무너진다.
 - **`model`을 지정하지 마라.** 생략 시 세션 모델을 상속한다. 세션 모델보다 낮은 모델로 내리지 마라.
@@ -351,7 +357,7 @@ Agent(
 
 ### 폴백
 
-1. `st-armorer` 스폰 실패(정의 부재 포함) → `subagent_type: "general-purpose"`로 스폰하고 **armorer 임무 전체를 프롬프트 본문에 브리핑하라**(팩 명세·절 제목·반환 규약 포함).
+1. `smartthink:st-armorer` 스폰 실패 → 위 이름 해석 규칙대로 bare `st-armorer`로 1회 재시도. **두 이름이 모두 실패**(정의 부재 포함)해야 폴백이다 → `subagent_type: "general-purpose"`로 스폰하고 **armorer 임무 전체를 프롬프트 본문에 브리핑하라**(팩 명세·절 제목·반환 규약 포함).
 2. 그것도 실패 → **5b 인라인 경로로 강등**하고 사용자에게 1줄로 알려라.
 
 ---
@@ -439,10 +445,10 @@ Agent 도구가 없거나 5a가 두 번 실패하면 이 경로다. **절차와 
 
 무장 결과를 팩으로 싣는 대신 **분석 보고서**를 받는 경로다. 5단계(팩 생성)까지는 동일하다.
 
-1. 팩이 완성되면 `st-thinker`를 **백그라운드**로 스폰하라. **입력은 팩 본문이 아니라 팩 파일 경로다.**
+1. 팩이 완성되면 `smartthink:st-thinker`를 **백그라운드**로 스폰하라. **입력은 팩 본문이 아니라 팩 파일 경로다.**
    ```
    Agent(
-     subagent_type: "st-thinker",
+     subagent_type: "smartthink:st-thinker",
      description: "SmartThink 팩 기반 분석",
      run_in_background: true,     // 피드백 루프(SendMessage 재개)를 위해 살려 둔다
      prompt: <아래 Input 블록>
@@ -462,7 +468,8 @@ Agent 도구가 없거나 5a가 두 번 실패하면 이 경로다. **절차와 
 6. **Step 5는 반드시 확정 이후에만.** 피드백으로 결론이 바뀌었는데 수정 전 인사이트가 진화 상태에 박제되는 것을 막는다
 7. **폴백**
    - thinker가 확정 신호에 무응답이거나 턴 소진으로 죽었으면 → 메인이 최종본 기준으로 Step 5를 직접 실행하라. 진화 상태 갱신을 조용히 소실시키지 마라
-   - `st-thinker` 정의가 없으면 → `general-purpose`로 스폰하고 `{SKILL_DIR}/references/thinker-prompt.md`(폴백 SSOT)를 Read해 변수를 치환한 전문을 prompt로 써라
+   - `smartthink:st-thinker`가 not found면 → 5a의 이름 해석 규칙대로 bare `st-thinker`로 1회 재시도. bare 이름은 같은 파일명의 구버전 정의를 오류 없이 스폰할 수 있으니, 반환이 팩 기반 보고서 형식이 아니면 정의가 다른 것으로 보고 다음 폴백으로 내려가라
+   - 두 이름 모두 실패하면 → `general-purpose`로 스폰하고 `{SKILL_DIR}/references/thinker-prompt.md`(폴백 SSOT)를 Read해 변수를 치환한 전문을 prompt로 써라
 
 ### `--lite`
 
@@ -546,8 +553,9 @@ Agent 도구가 없거나 5a가 두 번 실패하면 이 경로다. **절차와 
 | 결핍 | 동작 |
 |---|---|
 | Agent 도구 없음(Codex 등) | 인라인 경로. 게이트에 리서치 비용 표시 |
-| `st-armorer` 정의 없음 | `general-purpose` + 본문 브리핑 폴백, 그것도 없으면 인라인 |
-| `st-thinker` 정의 없음 | `--report`를 `general-purpose` + `thinker-prompt.md` 폴백 |
+| `smartthink:` 접두어 이름 not found | bare `st-armorer`/`st-thinker`로 1회 재시도(플러그인이 아닌 설치). 반환이 계약을 어기면 다른 정의로 보고 폴백 |
+| `smartthink:st-armorer` 정의 없음 | bare 재시도 실패 후 `general-purpose` + 본문 브리핑 폴백, 그것도 없으면 인라인 |
+| `smartthink:st-thinker` 정의 없음 | bare 재시도 실패 후 `--report`를 `general-purpose` + `thinker-prompt.md` 폴백 |
 | 검색 도구 없음/실패 | 팩 3절 생략, `manifest.research=false`, 브리핑에 명시 |
 | `insane-search` 없음 | WebFetch만. 차단 소스는 "차단"으로 표기하고 건너뜀 |
 | `uv` 없음 | `pip` → 없으면 설치 생략 |

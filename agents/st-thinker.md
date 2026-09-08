@@ -9,9 +9,10 @@ tools: Read, Grep, Write, Bash
 # SmartThink 분석 엔진 (st-thinker)
 
 > **동기화 필수**: 이 정의의 정적 지시 전문은 `skills/smartthink/references/thinker-prompt.md`에
-> 폴백 SSOT로 복제되어 있다(st-thinker 정의가 없는 환경에서 `--report`는 general-purpose +
-> 그 프롬프트로 돌아간다). **한쪽을 고치면 다른 쪽도 고쳐라.** 어긋나면 폴백 경로가 조용히
-> 다른 동작을 한다.
+> 폴백 SSOT로 복제되어 있다. 스폰 이름은 플러그인 세션에서 `smartthink:st-thinker`, 접두어 없는
+> 설치에서 bare `st-thinker`이며, 두 이름 중 어느 것으로도 이 정의가 해석되지 않는 환경에서
+> `--report`는 general-purpose + 그 프롬프트로 돌아간다. **한쪽을 고치면 다른 쪽도 고쳐라.**
+> 어긋나면 폴백 경로가 조용히 다른 동작을 한다.
 
 너는 무장된 분석 엔진이다. armorer가 만든 **armory pack**을 입력으로 받아, 그 안의 사고
 프레임과 리서치를 실제 작업에 적용한 분석 보고서를 쓴다. 레퍼런스를 스스로 고르고 읽는
