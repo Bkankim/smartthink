@@ -49,6 +49,7 @@ SKILL_MD = SKILL_DIR / "SKILL.md"
 ARMORER_MD = AGENTS_DIR / "st-armorer.md"
 THINKER_MD = AGENTS_DIR / "st-thinker.md"
 THINKER_PROMPT_MD = REFERENCES_DIR / "thinker-prompt.md"
+ANALYSIS_METHOD_MD = REFERENCES_DIR / "analysis-method.md"
 INDEX_JSON = REFERENCES_DIR / "index.json"
 PLUGIN_JSON = REPO_ROOT / ".claude-plugin" / "plugin.json"
 
@@ -941,6 +942,90 @@ def check_thinker_prompt_variables() -> Result:
     )
 
 
+# The three marker spellings pack section 5 is built from. analysis-method.md is the SSOT;
+# st-armorer.md needs its own copy because the armorer is told to read only Step 0.5 of that
+# file, so a format written down there alone is a format the pack writer never sees.
+MARKER_KINDS = ("MODULE-BEGIN", "MODULE-END", "MODULE-DIGEST")
+
+# Deliberately looser than the pack-mode regexes: this one has to catch a malformed marker
+# (missing space, uppercase field, stray indent) so the shape comparison below can report the
+# drift, instead of finding nothing and reporting "missing" for a marker that is right there.
+MARKER_LINE_RE = re.compile(
+    r"^[ \t>]*(?P<marker><!--\s*MODULE-(?:BEGIN|END|DIGEST)\b.*?-->)[ \t]*$", re.M
+)
+
+
+def _marker_shape(marker: str) -> str:
+    """Collapse the parts that vary per module (filename, hash value) so two files that agree
+    on the format compare equal even when their examples name different modules."""
+    shape = re.sub(r"(?<=sha256=)\S+", "<sha>", marker)
+    return re.sub(r"(?<=: )\S+(?=( sha256=| -->))", "<file>", shape)
+
+
+def _marker_shapes(text: str) -> dict[str, set[str]]:
+    shapes: dict[str, set[str]] = {kind: set() for kind in MARKER_KINDS}
+    for match in MARKER_LINE_RE.finditer(text):
+        marker = match.group("marker")
+        for kind in MARKER_KINDS:
+            if kind in marker:
+                shapes[kind].add(_marker_shape(marker))
+                break
+    return shapes
+
+
+def check_module_marker_forms() -> Result:
+    """st-armorer.md must spell the section 5 markers exactly the way analysis-method.md does.
+
+    The v3 gate run found 3 of 7 packs with no marker at all: the format existed only in
+    analysis-method.md, so whether a pack got markers depended on how far the armorer happened
+    to read. The format now lives in the agent definition too, and this check keeps the copy
+    from drifting away from the SSOT.
+    """
+    definition = read_text(ARMORER_MD)
+    canon = read_text(ANALYSIS_METHOD_MD)
+    if definition is None:
+        return bad(f"{rel(ARMORER_MD)} is missing or unreadable")
+    if canon is None:
+        return bad(f"{rel(ANALYSIS_METHOD_MD)} is missing or unreadable")
+
+    in_armorer = _marker_shapes(definition)
+    in_canon = _marker_shapes(canon)
+
+    problems: list[str] = []
+    evidence: list[str] = []
+    for kind in MARKER_KINDS:
+        canonical = in_canon[kind]
+        written = in_armorer[kind]
+        if not canonical:
+            problems.append(
+                f"{rel(ANALYSIS_METHOD_MD)} shows no {kind} marker; the SSOT for the section 5 "
+                "format is gone, so there is nothing to check the copy against"
+            )
+            continue
+        if not written:
+            problems.append(
+                f"{rel(ARMORER_MD)} shows no {kind} marker. The armorer writes section 5, so the "
+                f"format must be in its definition, not only in {rel(ANALYSIS_METHOD_MD)}."
+            )
+            continue
+        agreed = written & canonical
+        if not agreed:
+            problems.append(
+                f"{kind} format drifted: {rel(ARMORER_MD)} writes {sorted(written)} but "
+                f"{rel(ANALYSIS_METHOD_MD)} writes {sorted(canonical)}"
+            )
+            continue
+        evidence.append(f"{kind}: {sorted(agreed)[0]}")
+
+    if problems:
+        return bad(
+            f"{len(problems)} of {len(MARKER_KINDS)} module marker forms out of sync", problems
+        )
+    return ok(
+        f"all {len(MARKER_KINDS)} module marker forms match {rel(ANALYSIS_METHOD_MD)}", evidence
+    )
+
+
 # ---------------------------------------------------------------- E. v3 data schema
 
 
@@ -1539,6 +1624,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("D", "wiring: referenced references/ files exist", check_referenced_reference_files),
     ("D", "wiring: st-thinker definition and fallback prompt in sync", check_thinker_prompt_sync),
     ("D", "wiring: thinker-prompt substitution variables", check_thinker_prompt_variables),
+    ("D", "wiring: section 5 module marker forms match the SSOT", check_module_marker_forms),
     ("E", "schema: evolution-state.md v3 header", check_evolution_state_schema),
     ("E", "schema: profile.md v3 header", check_profile_schema),
     ("E", "schema: profile.md six blocks in order", check_profile_blocks),
