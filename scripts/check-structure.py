@@ -17,9 +17,15 @@ the module blocks copied into section 5.
 Usage:
   python3 scripts/check-structure.py [--verbose] [--strict] [--pack DIR] [--digest]
 
-Exit code is 1 if any check FAILs, else 0. Checks that depend on a file another worker
-still owns report SKIP; --strict promotes those to FAIL for the final gate. SKIPs that
-merely mean "you did not ask for this" (the pack group without --pack) are never promoted.
+Exit code is 1 if any check FAILs, else 0, across every group. Checks that depend on a
+file another worker still owns report SKIP; --strict promotes those to FAIL for the final
+gate. SKIPs that merely mean "you did not ask for this" (the pack group without --pack)
+are never promoted.
+
+The summary prints two lines: the repo-wide tally, then a "pack: N passed, M failed,
+K skipped" line counting only the H group, so a gate that cares about one pack can judge
+that line instead of the exit code. Style checks (em dash) skip tests/evidence, which
+holds verbatim captures rather than editable prose.
 """
 
 from __future__ import annotations
@@ -135,6 +141,11 @@ EM_DASH = "\u2014"
 
 # Tool and runtime caches: never part of the shipped plugin, never scanned.
 EXCLUDED_DIRS = frozenset({".git", ".ruff_cache", ".fablize", "__pycache__", "node_modules"})
+
+# Gate evidence is a verbatim capture of what a run produced: pack copies quote the frozen
+# modules and transcripts quote model output, so editing it to satisfy a style rule would
+# destroy the very thing it is evidence of. Style checks skip the whole directory.
+VERBATIM_EVIDENCE_DIR = REPO_ROOT / "tests" / "evidence"
 
 # Patterns are assembled from fragments on purpose: writing them as single literals would
 # make this file match its own scan and report a false hit.
@@ -1080,13 +1091,19 @@ def check_no_searcher_wiring() -> Result:
 
 def check_no_em_dash() -> Result:
     """Project rule: hyphens only. The nine frozen modules are exempt because
-    editing them would break every hash in index.json and in every existing pack."""
+    editing them would break every hash in index.json and in every existing pack,
+    and tests/evidence is exempt because it is a verbatim capture, not editable prose."""
     roots = (REPO_ROOT,)
+    candidates = _iter_repo_files((".md", ".py"), roots)
     files = [
         path
-        for path in _iter_repo_files((".md", ".py"), roots)
+        for path in candidates
         if not (path.parent == REFERENCES_DIR and path.name in MODULES)
+        and VERBATIM_EVIDENCE_DIR not in path.parents
     ]
+    evidence_skipped = len(
+        [path for path in candidates if VERBATIM_EVIDENCE_DIR in path.parents]
+    )
     exempt = [name for name in MODULES if EM_DASH in (read_text(REFERENCES_DIR / name) or "")]
 
     hits: list[str] = []
@@ -1103,12 +1120,13 @@ def check_no_em_dash() -> Result:
         if exempt
         else "no exemption needed"
     )
+    evidence_note = f"{evidence_skipped} verbatim evidence file(s) under {rel(VERBATIM_EVIDENCE_DIR)} not scanned"
     if hits:
         return bad(
             f"{len(hits)} em dash occurrence(s) in editable files; replace each with a hyphen",
-            hits + [note],
+            hits + [note, evidence_note],
         )
-    return ok(f"no em dashes in {len(files)} editable .md/.py files", [note])
+    return ok(f"no em dashes in {len(files)} editable .md/.py files", [note, evidence_note])
 
 
 def check_no_private_information() -> Result:
@@ -1399,6 +1417,9 @@ class Context:
     strict: bool
 
 
+# The pack group is the only group --pack turns on, so its tally is reported separately.
+PACK_GROUP = "H"
+
 CHECKS: tuple[tuple[str, str, object], ...] = (
     ("A", "layout: required paths exist", check_required_paths),
     ("A", "layout: plugin.json is valid and complete", check_plugin_json),
@@ -1430,11 +1451,11 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("F", "v2: no live st-searcher wiring", check_no_searcher_wiring),
     ("G", "hygiene: no em dash in editable files", check_no_em_dash),
     ("G", "hygiene: no private information", check_no_private_information),
-    ("H", "pack: pack.md and manifest.json exist", check_pack_files),
-    ("H", "pack: manifest schema and boolean research", check_pack_manifest),
-    ("H", "pack: section titles present and ordered", check_pack_sections),
-    ("H", "pack: section 5 verbatim hash integrity", check_pack_verbatim_integrity),
-    ("H", "pack: module markers scoped to section 5", check_pack_markers_scoped),
+    (PACK_GROUP, "pack: pack.md and manifest.json exist", check_pack_files),
+    (PACK_GROUP, "pack: manifest schema and boolean research", check_pack_manifest),
+    (PACK_GROUP, "pack: section titles present and ordered", check_pack_sections),
+    (PACK_GROUP, "pack: section 5 verbatim hash integrity", check_pack_verbatim_integrity),
+    (PACK_GROUP, "pack: module markers scoped to section 5", check_pack_markers_scoped),
 )
 
 
@@ -1485,6 +1506,7 @@ def main() -> int:
     )
 
     passed = failed = skipped = 0
+    pack_passed = pack_failed = pack_skipped = 0
     for group, name, function in CHECKS:
         result = run_check(function, context)
         status = result.status
@@ -1493,6 +1515,13 @@ def main() -> int:
             result.detail = f"promoted by --strict: {result.detail}"
 
         label = f"{group}. {name}"
+        if group == PACK_GROUP:
+            if status == STATUS_PASS:
+                pack_passed += 1
+            elif status == STATUS_SKIP:
+                pack_skipped += 1
+            else:
+                pack_failed += 1
         if status == STATUS_PASS:
             passed += 1
             print(f"{STATUS_PASS} {label}" + (f": {result.detail}" if context.verbose and result.detail else ""))
@@ -1511,6 +1540,7 @@ def main() -> int:
                 print(f"       - {line}")
 
     print(f"\n{passed} passed, {failed} failed, {skipped} skipped")
+    print(f"pack: {pack_passed} passed, {pack_failed} failed, {pack_skipped} skipped")
     return 1 if failed else 0
 
 
