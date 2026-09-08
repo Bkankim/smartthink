@@ -6,6 +6,12 @@ It backs up a legacy file before replacing it and leaves already-v3 files untouc
 Legacy prose is preserved; only data promoted into the YAML header is removed.
 Running without --write is a dry run: the conversion is reported and nothing is
 written. Pass --write to back up the original and convert it in place.
+
+The script owns the backup, so no manual copy is needed. If a backup already
+exists at evolution-state.v2.bak.md and is byte identical to the original, it is
+kept and the conversion proceeds, so a manual copy made beforehand is not an
+error. A backup that differs from the original is a conflict: the run stops
+without touching either file until --force replaces it.
 """
 
 from __future__ import annotations
@@ -67,12 +73,17 @@ class Migration:
 def parse_arguments() -> argparse.Namespace:
     # Parse the target path and the migration options; writing is opt-in.
     parser = argparse.ArgumentParser(
-        description="Convert a legacy evolution-state.md file to v3. Without --write this is a dry run."
+        description=(
+            "Convert a legacy evolution-state.md file to v3. Without --write this is a dry run. "
+            "--write creates the evolution-state.v2.bak.md backup itself; an existing backup that "
+            "matches the original is kept and the conversion continues, while one that differs stops "
+            "the run until --force replaces it."
+        )
     )
     parser.add_argument("path", nargs="?", type=Path, help="path to evolution-state.md")
     parser.add_argument("--write", action="store_true", help="back up the original and convert it in place")
     parser.add_argument("--dry-run", action="store_true", help="accepted for compatibility; a dry run is the default")
-    parser.add_argument("--force", action="store_true", help="replace an existing v2 backup")
+    parser.add_argument("--force", action="store_true", help="replace a v2 backup that differs from the original")
     return parser.parse_args()
 
 
@@ -231,18 +242,39 @@ def write_bytes(path: Path, content: bytes) -> None:
         raise
 
 
-def write_command(target: Path, backup_exists: bool) -> str:
+def classify_backup(backup: Path, original: bytes) -> str:
+    # Decide what a --write run does with the backup: create, keep, or refuse.
+    if not backup.exists():
+        return "create"
+    try:
+        return "keep" if backup.read_bytes() == original else "conflict"
+    except OSError:
+        return "conflict"
+
+
+def write_command(target: Path, backup_state: str) -> str:
     # Build the exact command that performs the write this dry run only described.
     parts = ["python3", "scripts/migrate-evolution.py", shlex.quote(str(target)), "--write"]
-    if backup_exists:
+    if backup_state in {"conflict", "replace"}:
         parts.append("--force")
     return " ".join(parts)
 
 
-def report(target: Path, backup: Path, migration: Migration, dry_run: bool) -> None:
+def describe_backup(backup: Path, backup_state: str, dry_run: bool) -> str:
+    # Describe the backup outcome in the same words for dry runs and real writes.
+    if backup_state == "keep":
+        return f"{'would keep' if dry_run else 'kept'} the existing {backup} (byte identical to the original)"
+    if backup_state == "conflict":
+        return f"{backup} exists and differs from the original; --force is needed to replace it"
+    if backup_state == "replace":
+        return f"{'would replace' if dry_run else 'replaced'} {backup} (--force; the previous backup differed from the original)"
+    return f"{'would create' if dry_run else 'created'} {backup}"
+
+
+def report(target: Path, backup: Path, migration: Migration, dry_run: bool, backup_state: str) -> None:
     # Print a human-readable account of recovered and unavailable legacy data.
     print(f"target: {target}")
-    print(f"backup: {'would create' if dry_run else 'created'} {backup}")
+    print(f"backup: {describe_backup(backup, backup_state, dry_run)}")
     print(f"sessions: {migration.sessions} (legacy history or freshness tags; 0 means no evidence)")
     print(f"diversity_h: {migration.diversity:.2f} ({migration.diversity_source})")
     print("preserved sections: " + ", ".join(migration.section_titles))
@@ -255,12 +287,11 @@ def report(target: Path, backup: Path, migration: Migration, dry_run: bool) -> N
     if migration.insights > 10 or migration.gaps > 5:
         print(f"slot overflow preserved without deletion: insights={migration.insights}, gaps={migration.gaps}")
     if dry_run:
-        backup_exists = backup.exists()
-        if backup_exists:
-            print(f"warning: a backup already exists at {backup}; writing needs --force to replace it")
+        if backup_state == "conflict":
+            print(f"warning: the backup at {backup} differs from the original; writing needs --force to replace it")
         print("dry-run: no files were written\n")
         print(migration.content, end="" if migration.content.endswith("\n") else "\n")
-        print(f"\nto write this conversion, run: {write_command(target, backup_exists)}")
+        print(f"\nto write this conversion, run: {write_command(target, backup_state)}")
 
 
 def main() -> int:
@@ -287,23 +318,32 @@ def main() -> int:
         print("error: no legacy evolution sections were parsed; original file was left unchanged", file=sys.stderr)
         return 1
     backup = target.with_name(BACKUP_NAME)
+    backup_state = classify_backup(backup, original)
+    if backup_state == "conflict" and arguments.force:
+        backup_state = "replace"
     if not arguments.write:
-        report(target, backup, migration, True)
+        report(target, backup, migration, True, backup_state)
         return 0
-    if backup.exists() and not arguments.force:
-        print(f"error: backup already exists at {backup}; use --force to replace it", file=sys.stderr)
+    if backup_state == "conflict" and not arguments.force:
+        print(
+            f"error: the backup at {backup} exists and does not match {target}; "
+            "it holds a different original, so nothing was written. "
+            "Rename it if you want to keep it, or rerun with --force to replace it",
+            file=sys.stderr,
+        )
         return 1
-    try:
-        write_bytes(backup, original)
-    except OSError as error:
-        print(f"error: backup failed at {backup}; original was not converted: {error}", file=sys.stderr)
-        return 1
+    if backup_state != "keep":
+        try:
+            write_bytes(backup, original)
+        except OSError as error:
+            print(f"error: backup failed at {backup}; original was not converted: {error}", file=sys.stderr)
+            return 1
     try:
         write_bytes(target, migration.content.encode("utf-8"))
     except OSError as error:
         print(f"error: conversion write failed after backup at {backup}: {error}", file=sys.stderr)
         return 1
-    report(target, backup, migration, False)
+    report(target, backup, migration, False, backup_state)
     return 0
 
 
