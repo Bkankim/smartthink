@@ -1,0 +1,22 @@
+{
+  "task": "지역 행사 자원봉사자 배치 방식을 검토해줘",
+  "interpretation": "지역 행사의 자원봉사자 배치 방식(포지션·시간대·인원 배정 규칙과 당일 운영)을 검토하고 개선안을 도출하는 작업. 작업 설명이 아니라 주제에 가깝게 들어왔으므로 2절에 예상 작업 A(현행 배치 방식의 실패 지점 진단) / B(배치 규칙·스킬 매칭 설계 재설계) / C(당일 노쇼·결원 대응 운영 프로토콜 수립)를 남겼다. 사전 설계는 복잡(분석), 당일 운영은 복합(실험)으로 행동 모델이 갈리는 이중 구조다.",
+  "cynefin": "Complicated",
+  "classification": "문제 해결",
+  "modules": [
+    "core-engines.md",
+    "cognitive-arsenal.md",
+    "anti-fragile-strategy.md",
+    "execution-velocity.md",
+    "meta-cognition.md"
+  ],
+  "budget": 60000,
+  "research": true,
+  "profile_version": "3",
+  "est_tokens": {
+    "pack": 44916,
+    "agent": 192000
+  },
+  "created": "2026-09-18T02:06:00+09:00",
+  "harness": "claude-code"
+}
