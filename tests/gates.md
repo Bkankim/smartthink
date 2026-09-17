@@ -116,10 +116,11 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
   - `pack.md` 5절에 각 모듈마다 `<!-- MODULE-DIGEST: <파일명>.md -->` 형식의 마커가 있다.
   - 5절에 `MODULE-BEGIN`, `sha256=`, `MODULE-END` 마커가 없고 원문 모드와 digest 모드가 섞이지 않는다.
   - `manifest.json`의 `modules`는 문자열 배열이며 digest 전용 필드가 추가되지 않았다.
-  - `manifest.est_tokens.pack` 값이 20000 이하이고, `python3 scripts/check-structure.py --pack <팩경로>`가 종료 코드 0이다.
+  - **5절 바이트 / 2.2 ≤ 20000**이다. 상한은 5절에만 적용하고 팩 전체(`est_tokens.pack`)에는 적용하지 않는다 - 1~4·6절은 digest 여부와 무관하게 동일하기 때문이다. 측정: `awk '/^## 5\. 레퍼런스 원문$/{f=1} /^## 6\. 과거 인사이트와 프로필$/{f=0} f' <팩경로>/pack.md | wc -c`
+  - `python3 scripts/check-structure.py --pack <팩경로> --digest`가 종료 코드 0이다.
   - 브리핑에 5절이 원문이 아닌 증류본이라는 사실이 한 줄로 명시된다.
-- **증거**: `T4-manifest.json`, `T4-pack.md`, `T4-transcript.md`, `T4-structure-check.txt`를 남긴다. 마지막 파일에는 검사 명령과 종료 코드 0을 포함한다.
-- **실패 시 흔한 원인**: digest 팩에 원문 마커를 섞음, `est_tokens.pack`을 실제 pack 크기 기준으로 기록하지 않음, 20K 상한을 넘김.
+- **증거**: `T4-manifest.json`, `T4-pack.md`, `T4-transcript.md`, `T4-structure-check.txt`를 남긴다. 마지막 파일에는 검사 명령과 종료 코드 0, 5절 바이트 측정 명령과 값을 포함한다.
+- **실패 시 흔한 원인**: digest 팩에 원문 마커를 섞음, `est_tokens.pack`을 실제 pack 크기 기준으로 기록하지 않음, 5절 증류본이 20K 상한을 넘김, 팩 전체 크기를 5절 상한으로 오인해 1~4·6절을 임의로 축약함.
 
 ### T5. `--report`와 확정 후 진화 기록
 
