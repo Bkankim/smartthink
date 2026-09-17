@@ -1,0 +1,21 @@
+# 2026-09-18 코디네이터 재실행 구조 검사
+
+$ python3 scripts/check-structure.py --pack <T2-rerun 팩>
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+pack: 5 passed, 0 failed, 0 skipped
+exit=0
+
+$ python3 scripts/check-structure.py --pack <T4-rerun 팩> --digest
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+pack: 5 passed, 0 failed, 0 skipped
+exit=0
+
+T4 5절 측정: awk 구간 추출 | wc -c = 43791 bytes -> /2.2 = 19905 tokens <= 20000
