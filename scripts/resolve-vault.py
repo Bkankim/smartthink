@@ -198,8 +198,16 @@ def walk_dirs(home: Path, deadline: float, state: dict):
                 stack.append((Path(entry.path), depth + 1))
 
 
+def present(path: Path) -> bool:
+    # Path.exists() raises PermissionError on Python < 3.14 for an unreadable parent; treat as absent.
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
 def signals_of(directory: Path) -> list[str]:
-    signals = [f"marker:{name}" for name in MARKERS if (directory / name).exists()]
+    signals = [f"marker:{name}" for name in MARKERS if present(directory / name)]
     name = re.sub(r"[\s_]+", "-", directory.name.lower())
     word = next((word for word in NAME_WORDS if word in name), None)
     if word:
@@ -215,14 +223,15 @@ def obsidian_registries() -> list[Path]:
     ]
 
 
-def count_files(directory: Path, deadline: float) -> tuple[int, float | None, bool]:
+def count_files(directory: Path, deadline: float) -> tuple[int, float | None, str | None]:
     # Count files (stopping at FILE_COUNT_CAP) and track the newest mtime, skipping hidden folders.
-    # The third value is False when the deadline cut the count short.
+    # The third value says why the count is incomplete: "deadline", "error" (a stat failed, e.g. a
+    # file vanished mid-scan), "cap" (FILE_COUNT_CAP reached, the mtimes are a sample), or None.
     count, newest = 0, None
     stack = [directory]
-    while stack and count < FILE_COUNT_CAP:
+    while stack:
         if time.monotonic() >= deadline:
-            return count, newest, False
+            return count, newest, "deadline"
         try:
             entries = list(os.scandir(stack.pop()))
         except OSError:
@@ -230,17 +239,29 @@ def count_files(directory: Path, deadline: float) -> tuple[int, float | None, bo
         for entry in entries:
             if entry.name.startswith(".") or entry.name in SKIPPED_NAMES:
                 continue
-            if entry.is_dir(follow_symlinks=False):
-                stack.append(Path(entry.path))
-            elif entry.is_file(follow_symlinks=False):
-                count += 1
-                mtime = entry.stat(follow_symlinks=False).st_mtime
-                newest = mtime if newest is None else max(newest, mtime)
-    return count, newest, True
+            try:
+                if entry.is_dir(follow_symlinks=False):
+                    stack.append(Path(entry.path))
+                elif entry.is_file(follow_symlinks=False):
+                    mtime = entry.stat(follow_symlinks=False).st_mtime
+                    count += 1
+                    newest = mtime if newest is None else max(newest, mtime)
+                    if count >= FILE_COUNT_CAP:
+                        return count, newest, "cap"
+            except OSError:
+                return count, newest, "error"
+    return count, newest, None
 
 
 def in_git_repo(directory: Path) -> bool:
-    return any((folder / ".git").exists() for folder in (directory, *directory.parents))
+    # Stop below HOME: a $HOME/.git dotfiles repo does not version an ordinary folder under home.
+    home = Path.home()
+    for folder in (directory, *directory.parents):
+        if folder == home:
+            return False
+        if present(folder / ".git"):
+            return True
+    return False
 
 
 def nested_repos(directory: Path, deadline: float) -> int | None:
@@ -251,7 +272,8 @@ def nested_repos(directory: Path, deadline: float) -> int | None:
         for folder in directory.glob(pattern):
             if time.monotonic() >= deadline:
                 return None
-            if (folder / ".git").is_dir():
+            # A worktree or submodule has a .git file, not a folder; both mark a repository.
+            if present(folder / ".git"):
                 found += 1
                 if found >= WORKSPACE_REPOS:
                     return found
@@ -259,22 +281,32 @@ def nested_repos(directory: Path, deadline: float) -> int | None:
 
 
 def describe(directory: Path, signals: list[str], deadline: float, state: dict) -> dict:
-    count, newest, counted = count_files(directory, deadline)
-    repos = nested_repos(directory, deadline) if counted else None
+    count, newest, cut = count_files(directory, deadline)
+    # The repo count does not depend on the file sample, so it is still taken when the cap was hit.
+    repos = nested_repos(directory, deadline) if cut in (None, "cap") else None
+    if cut in (None, "cap") and repos is None:
+        cut = "deadline"
     if newest is None:
-        newest = directory.stat().st_mtime
+        try:
+            newest = directory.stat().st_mtime
+        except OSError:
+            newest, cut = time.time(), cut or "error"
     warnings = []
-    if counted and repos is not None:
+    if cut is None:
         if time.time() - newest > STALE_DAYS * 86400:
             warnings.append("stale")
         if count <= NEARLY_EMPTY_FILES:
             warnings.append("nearly-empty")
-        if repos >= WORKSPACE_REPOS:
-            warnings.append("workspace-root")
     else:
-        # The time limit cut the facts short, so the other warnings would be guesses.
+        # The facts were cut short (time limit, failed stat or file cap), so these warnings would be guesses.
         warnings.append("partial")
-        state["timed_out"] = True
+        if cut == "deadline":
+            state["timed_out"] = True
+    if repos is not None and repos >= WORKSPACE_REPOS:
+        warnings.append("workspace-root")
+    if ineffective_reason(directory / "smartthink") == "special-characters":
+        # The Edit rule for this vault may not match, so its writes would keep prompting (issue #23).
+        warnings.append("special-characters")
     return {
         "path": str(directory),
         "signals": signals,
@@ -287,7 +319,9 @@ def describe(directory: Path, signals: list[str], deadline: float, state: dict) 
 
 
 def is_refused(directory: Path) -> bool:
-    if (REFUSED_PARTS | PROTECTED_FOLDERS).intersection(directory.parts):
+    # Check the real path too: a registered folder may be a symlink into a protected folder.
+    parts = (*directory.parts, *Path(os.path.realpath(directory)).parts)
+    if (REFUSED_PARTS | PROTECTED_FOLDERS).intersection(parts):
         return True
     return under_home_claude(directory)
 

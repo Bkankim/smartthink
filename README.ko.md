@@ -63,8 +63,9 @@ cd smartthink
 ```
 
 스킬 1개(`smartthink`), 에이전트 정의 2개(`st-thinker`, `st-armorer`), `/st` 명령 별칭을
-설치하고 `~/.local/share/smartthink/`(`XDG_DATA_HOME`이 있으면 `$XDG_DATA_HOME/smartthink`)에 빈 vault를
-시드한다(`SMARTTHINK_VAULT`로 변경 가능).
+설치하고, vault 위치(`~/.local/share/smartthink/`, `XDG_DATA_HOME`이 있으면 `$XDG_DATA_HOME/smartthink`,
+`SMARTTHINK_VAULT`로 변경 가능)에 쓸 수 있는지만 확인한다. 폴더는 만들지 않는다. `/st init`에서 vault를
+고를 수 있고, 첫 실행이 정해진 vault를 만든다.
 v2에서 올라오는 경우 v3에서 삭제된 에이전트 정의를 가리키던 심링크도 함께 정리한다.
 
 #### 이전 설치에서 올라오는 경우

@@ -329,11 +329,11 @@ class CandidatesTest(unittest.TestCase):
     def tearDown(self) -> None:
         self._tmp.cleanup()
 
-    def scan(self, *args: str) -> dict:
+    def scan(self, *args: str, python: str = sys.executable) -> dict:
         env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
         env["HOME"] = str(self.home)
         completed = subprocess.run(
-            [sys.executable, str(RESOLVER), "--candidates", *args],
+            [python, str(RESOLVER), "--candidates", *args],
             env=env,
             cwd=self.root,
             capture_output=True,
@@ -517,6 +517,111 @@ class CandidatesTest(unittest.TestCase):
         self.assertEqual(candidate["warnings"], ["partial"])
         self.assertEqual(full[str(big)]["file_count"], 3000)
         self.assertNotIn("partial", full[str(big)]["warnings"])
+
+    def test_unreadable_folder_does_not_break_the_scan(self) -> None:
+        # Path.exists() re-raises PermissionError before Python 3.14, and the installer may run the
+        # system python3 (3.9 on macOS). Scan with every interpreter at hand.
+        store = self.make_store("Documents/Brain", ".obsidian")
+        locked = self.home / "locked"
+        locked.mkdir()
+        locked.chmod(0)
+        pythons = [sys.executable] + [path for path in ("/usr/bin/python3",) if os.path.exists(path)]
+        try:
+            for python in pythons:
+                with self.subTest(python=python):
+                    found = self.by_path(self.scan(python=python))
+
+                    self.assertEqual(set(found), {str(store)})
+        finally:
+            locked.chmod(0o755)
+
+    def test_worktrees_count_as_repositories(self) -> None:
+        # A git worktree or submodule has a .git file pointing at the real repository.
+        workspace = self.make_store("workspace", ".obsidian", files=10)
+        (workspace / "main" / ".git").mkdir(parents=True)
+        for index in range(3):
+            (workspace / f"wt-{index}").mkdir()
+            (workspace / f"wt-{index}" / ".git").write_text("gitdir: ../main/.git/worktrees/x\n", encoding="utf-8")
+
+        found = self.by_path(self.scan())
+
+        self.assertEqual(found[str(workspace)]["warnings"], ["workspace-root"])
+
+    def test_registry_symlink_into_protected_folder_is_refused(self) -> None:
+        # The link itself looks harmless; its target sits in a folder Claude Code guards.
+        target = self.make_store("repo/.vscode/wiki", ".obsidian")
+        link = self.home / "notes-link"
+        link.symlink_to(target)
+        self.write_registry(".config/obsidian/obsidian.json", str(link))
+
+        found = self.by_path(self.scan())
+
+        self.assertNotIn(str(link), found)
+
+    def test_rule_syntax_in_a_candidate_path_is_warned(self) -> None:
+        # Issue #23: the Edit rule for such a vault may not match, so say so before the user picks it.
+        store = self.make_store("Obsidian [main]", ".obsidian", files=10)
+
+        found = self.by_path(self.scan())
+
+        self.assertEqual(found[str(store)]["warnings"], ["special-characters"])
+
+    def test_stat_failure_marks_only_that_candidate_partial(self) -> None:
+        # A folder with read but no search permission lists its names, but lstat on each entry fails.
+        # That stands in for a file vanishing mid-scan: the candidate is partial, the scan survives.
+        broken = self.make_store("Broken Vault", ".obsidian", files=5)
+        attic = broken / "attic"
+        attic.mkdir()
+        (attic / "old.md").write_text("x\n", encoding="utf-8")
+        attic.chmod(0o444)
+        fine = self.make_store("notes", files=10)
+        try:
+            found = self.by_path(self.scan())
+        finally:
+            attic.chmod(0o755)
+
+        self.assertEqual(found[str(broken)]["warnings"], ["partial"])
+        self.assertEqual(found[str(fine)]["warnings"], [])
+
+    def test_file_count_cap_marks_the_candidate_partial(self) -> None:
+        # Past the cap the newest mtime comes from a sample, so stale and nearly-empty would be guesses.
+        big = self.make_store("Archive Vault", ".obsidian", files=0)
+        for folder in range(11):
+            (big / f"d{folder}").mkdir()
+            for index in range(500):
+                (big / f"d{folder}" / f"n{index}.md").write_text("x\n", encoding="utf-8")
+        self.age(big, 1768478400)  # 2026-01-15T12:00:00Z: every sampled file looks stale
+
+        found = self.by_path(self.scan())
+
+        self.assertEqual(found[str(big)]["file_count"], 5000)
+        self.assertEqual(found[str(big)]["warnings"], ["partial"])
+
+    def test_capped_workspace_root_keeps_its_warning(self) -> None:
+        # A real work folder easily passes the file cap; the repo count does not depend on the sample.
+        workspace = self.make_store("workspace", ".obsidian", files=0)
+        for index in range(3):
+            repo = workspace / f"repo-{index}"
+            (repo / ".git").mkdir(parents=True)
+            for number in range(1700):
+                (repo / f"f{number}.py").write_text("x\n", encoding="utf-8")
+
+        found = self.by_path(self.scan())
+
+        self.assertEqual(found[str(workspace)]["warnings"], ["partial", "workspace-root"])
+
+    def test_dotfiles_repo_at_home_is_not_a_vault_repo(self) -> None:
+        # A $HOME/.git dotfiles repo does not version an ordinary notes folder under home.
+        (self.home / ".git").mkdir()
+        notes = self.make_store("notes", files=10)
+        repo = self.home / "code" / "site"
+        (repo / ".git").mkdir(parents=True)
+        in_repo = self.make_store("code/site/notes", files=10)
+
+        found = self.by_path(self.scan())
+
+        self.assertFalse(found[str(notes)]["git_repo"])
+        self.assertTrue(found[str(in_repo)]["git_repo"])
 
 
 if __name__ == "__main__":

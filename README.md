@@ -64,8 +64,9 @@ cd smartthink
 ```
 
 It installs one skill (`smartthink`), two agent definitions (`st-thinker`, `st-armorer`), and the
-`/st` command alias, then seeds an empty vault at `~/.local/share/smartthink/`
-(`$XDG_DATA_HOME/smartthink` when set; override with `SMARTTHINK_VAULT`). Upgrading from v2 also clears the symlink to the agent
+`/st` command alias, and checks that the vault location (`~/.local/share/smartthink/`, or
+`$XDG_DATA_HOME/smartthink` when set; override with `SMARTTHINK_VAULT`) is writable. It does not create
+the folder: `/st init` lets you pick a vault, and the first run creates whichever one is chosen. Upgrading from v2 also clears the symlink to the agent
 definition that v3 deleted.
 
 #### Upgrading from an earlier install
