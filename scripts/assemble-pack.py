@@ -32,7 +32,7 @@ REFERENCES_DIR = Path(__file__).resolve().parent.parent / "skills" / "smartthink
 # The nine frozen modules are the keys of index.json; nothing else may be copied into section 5.
 INDEX_JSON = REFERENCES_DIR / "index.json"
 
-SECTION_FIVE = b"## 5. \xeb\xa0\x88\xed\x8d\xbc\xeb\x9f\xb0\xec\x8a\xa4 \xec\x9b\x90\xeb\xac\xb8"
+SECTION_FIVE = "## 5. 레퍼런스 원문".encode("utf-8")
 SECTION_SIX = "## 6. 과거 인사이트와 프로필".encode("utf-8")
 
 # The marker spellings. check-structure.py D compares these templates with analysis-method.md.
