@@ -158,27 +158,53 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 
 ### 4. 권한 규칙 제안
 
-`~/.claude/settings.json`에 `Edit(<VAULT>/**)` 허용 규칙을 넣을지 **묻는다.**
+규칙 문자열과 대상 파일은 **직접 만들지 말고 resolver로 얻는다.**
+`python3 "{SCRIPTS_DIR}/resolve-vault.py" --permission-rule`이 출력한 JSON의
+`permission_rule`이 넣을 규칙이고, `settings_path`가 넣을 파일이다(이하 `<RULE>`, `<SETTINGS>`).
+
+- `<SETTINGS>`는 `${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`이다. `CLAUDE_CONFIG_DIR`로 뜬
+  세션에서 홈의 `.claude` 설정을 대상으로 삼으면 이 세션이 읽지 않는 다른 설정을 고치게 된다.
+- `<RULE>`은 vault가 홈 아래면 `Edit(~/<홈 기준 경로>/**)`, 아니면 `Edit(//<절대경로>/**)`
+  (슬래시 두 개 + 앞 `/`를 뺀 절대경로)다.
+- **단일 `/`로 시작하는 `Edit(/<절대경로>/**)`를 쓰지 마라.** Claude Code는 `/`로 시작하는 규칙
+  경로를 설정 파일 기준 상대경로로 해석하므로 vault와 매칭되지 않고 프롬프트가 그대로 뜬다(#14).
+- **`permission_rule_effective`가 `false`면 규칙을 제안하지 마라.** vault가 `~/.claude` 아래(기본값
+  `~/.claude/smartthink-vault` 포함)면 Claude Code가 그 아래 쓰기를 민감 파일로 보고 허용 규칙과
+  무관하게 매번 묻는다. 규칙을 넣어도 프롬프트가 사라지지 않으니 설치하지 말고 이렇게 알린다.
+
+  ```
+  vault가 ~/.claude 아래라서 Claude Code가 팩 쓰기마다 확인을 받는다(허용 규칙으로 못 없앰).
+  프롬프트를 없애려면 /st init을 다시 실행해 2절에서 ~/.claude 밖 경로를 고르거나,
+  SMARTTHINK_VAULT로 ~/.claude 밖 경로를 지정하면 된다. 그대로 둬도 무장은 동작한다.
+  세션 중에는 프롬프트의 "allow Claude to edit files in its ~/.claude folder for this session"로 넘길 수 있다.
+  ```
+
+- `true`일 때만 설치 여부를 **묻는다.**
 
 ```
 백그라운드 에이전트가 vault에 팩을 쓸 때 권한 프롬프트가 뜬다.
-~/.claude/settings.json에 Edit(~/notes/smartthink/**) 허용 규칙을 넣을까?
+<SETTINGS>에 <RULE> 허용 규칙을 넣을까?
 거절해도 무장은 그대로 동작하고, 매번 승인 프롬프트가 뜰 뿐이야.
 ```
 
 - **승인했을 때만 기록한다.** 묻지 않고 쓰는 건 금지다.
 - 거절해도 아무 기능이 죽지 않는다는 걸 알려라. 압박하지 마라.
 
-`settings.json`은 **리포 밖 파일이다.** 쓰기 규율:
+`<SETTINGS>`는 **리포 밖 파일이다.** 쓰기 규율:
 
 1. 파일을 먼저 Read한다.
 2. **없으면 쓰지 말고 사용자에게 보고하라.** 새로 만들지 마라. 다른 설정이 있어야 할 자리에
    빈 파일을 만들면 사용자가 나중에 원인을 못 찾는다.
 3. **JSON 파싱이 깨져 있으면 쓰지 말고 보고하라.** 깨진 파일을 고치려 들지 마라.
-4. 쓰기 전 백업을 권장한다: `cp ~/.claude/settings.json ~/.claude/settings.json.bak`
+4. 쓰기 전 백업을 권장한다: `cp "<SETTINGS>" "<SETTINGS>.bak"` (경로는 resolver 출력값을 그대로 쓴다)
 5. **기존 내용을 보존하는 머지여야 한다.** 통째 덮어쓰기 금지. 기존 `permissions.allow` 배열에
    항목 하나를 추가하는 것이고, 다른 키·다른 항목은 한 글자도 건드리지 않는다.
-6. 같은 규칙이 이미 있으면 중복 추가하지 말고 "이미 있음"이라고 알린다.
+6. **동등한 규칙**이 이미 있으면 중복 추가하지 말고 "이미 있음"이라고 알린다. 동등한 규칙은
+   `<RULE>` 자체이거나, 같은 vault 또는 그 상위 경로를 `Edit(~/.../**)` 또는 `Edit(//.../**)`로
+   가리키는 항목이다(문자열이 달라도 가리키는 경로로 판정). 끝이 `/**` 재귀 glob이 아니면
+   (`Edit(~/notes/smartthink)`, `Edit(~/notes/*)`) 하위 팩 파일과 매칭되지 않으므로 동등하지 않다.
+   같은 vault를 가리키는 단일 `/` 형식 규칙이 남아 있으면 매칭되지 않는 규칙이라고 알리고, 지울지는
+   사용자가 정한다.
 
 ### 5. 완료 보고
 
@@ -327,7 +353,8 @@ v3 스키마 자체는 `references/analysis-method.md` Step 5의 스키마 절�
 
 **읽기 전용이다. 아무것도 쓰지 않는다.** vault 시드 생성도, `updated` 갱신도, 팩 삭제도 하지 않는다.
 고칠 게 보이면 **무엇을 하면 되는지 안내만** 하고 사용자가 실행하게 한다.
-`{VAULT}`는 resolver를 **`--ensure` 없이** 실행해 얻는다(`python3 "{SCRIPTS_DIR}/resolve-vault.py"`).
+`{VAULT}`는 resolver를 **`--ensure` 없이** 실행해 얻는다(`python3 "{SCRIPTS_DIR}/resolve-vault.py" --permission-rule`).
+같은 출력의 `permission_rule`·`settings_path`를 4절의 권한 규칙 진단에 쓴다.
 
 ### 1. 프로필 요약
 
@@ -368,7 +395,7 @@ v2 형식(YAML 헤더 없음)이면 그 사실을 표시하고 "첫 `/st retain`
 | 사용자 레벨 옛 설치 잔재 | `python3 "{SCRIPTS_DIR}/legacy-install.py" detect` 출력이 비어 있음 | 복사 설치된 옛 파일이나 옛 체크아웃을 가리키는 링크가 bare 이름(`/st`, `/smartthink`, `st-thinker`)을 선점해 이 버전 대신 열림 |
 | vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고 1줄 표시 |
 | vault 쓰기 가능 | **디렉터리 권한으로 판정**(`test -w {VAULT}`) | 팩·프로필·진화 상태가 기록되지 않음 |
-| 권한 규칙 | `~/.claude/settings.json`에 `Edit(<VAULT>/**)` | 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸 |
+| 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: vault가 `~/.claude` 아래라 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 ~/.claude 밖 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소 |
 | `references/index.json` | 파일 존재 | 게이트의 비용 추정이 사전 계산값 대신 실측 근사로 내려감 |
 | 검색 도구 | WebSearch·WebFetch 사용 가능 여부 | 팩 3절(리서치 합성) 생략, `manifest.research=false` |
 | `insane-search` 스킬 | Skill 목록에 존재 | WebFetch만 사용. 차단된 소스는 "차단"으로 표기하고 건너뜀 |
@@ -383,6 +410,8 @@ NG 항목이 있으면 **무엇을 하면 되는지 1줄씩** 붙인다. 전부 
 다음 액션
   프로필 없음          /st init 으로 프로필을 만들면 다음 무장부터 사용자에 맞게 라우팅됨
   권한 규칙 없음        /st init 을 다시 돌리면 규칙 설치를 다시 물어봄 (거절해도 동작함)
+  권한 규칙 형식 틀림   단일 / 규칙은 매칭 안 됨. /st init 을 다시 돌려 ~/ 또는 // 형식 규칙을 설치
+  vault가 ~/.claude 아래  팩 쓰기마다 확인이 뜸(규칙으로 못 없앰). /st init 에서 vault를 ~/.claude 밖으로 옮기면 해소
   팩 23개 (상한 20)     {VAULT}/packs/ 에서 오래된 3개를 지울지 확인 (자동 삭제하지 않음)
   옛 설치 잔재          SmartThink 클론에서 ./install.sh --migrate-legacy (플러그인 설치면 ./uninstall.sh --migrate-legacy). 복사본은 ~/.claude/.backup/ 으로 이동만 되고, 옛 체크아웃 링크는 옵션 없이도 교체·제거됨
   st-armorer 없음       install.sh 사용자는 클론에서 ./install.sh 재실행, 플러그인 사용자는 플러그인 재설치

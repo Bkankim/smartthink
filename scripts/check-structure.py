@@ -1244,6 +1244,54 @@ def check_vault_resolver_wiring() -> Result:
     return ok("SKILL.md, lifecycle.md and both installers resolve {VAULT} through resolve-vault.py")
 
 
+# Issue #14: a rule path with a single leading / is relative to the settings file, so the vault
+# never matches, and a hardcoded ~/.claude/settings.json ignores CLAUDE_CONFIG_DIR.
+PERMISSION_RULE_LEFTOVERS = (
+    (r"Edit\(\s*[<{]VAULT[>}]", "vault placeholder rule expands to a single-/ path"),
+    (r"Edit\(/(?!/)", "single-/ rule path is relative to the settings file"),
+    (r"~/\.claude/settings\.json", "hardcoded settings file ignores CLAUDE_CONFIG_DIR"),
+)
+# A line may show the single-/ form only as the literal placeholder, and only to forbid it or flag
+# it as NG. Warnings are whole words so "NG" inside <SETTINGS> or WARNING does not count.
+PERMISSION_RULE_WARNINGS = re.compile(r"쓰지 마라|매칭 안 됨|\bNG\b")
+SINGLE_SLASH_EXAMPLE = "Edit(/<절대경로>/**)"
+
+
+def check_permission_rule_format() -> Result:
+    """init/status and every doc that describes the rule must name only ~/ or // rules in the resolved settings."""
+    problems: list[str] = []
+    for path in (REFERENCES_DIR / "lifecycle.md", SKILL_MD, DATA_DIR / "README.md", ANALYSIS_METHOD_MD):
+        text = read_text(path)
+        if text is None:
+            problems.append(f"{rel(path)}: missing or unreadable, so its rule wording cannot be checked")
+            continue
+        for number, line in enumerate(text.splitlines(), start=1):
+            for pattern, reason in PERMISSION_RULE_LEFTOVERS:
+                if not re.search(pattern, line):
+                    continue
+                if (
+                    pattern.startswith(r"Edit\(/")
+                    and PERMISSION_RULE_WARNINGS.search(line)
+                    and not re.search(pattern, line.replace(SINGLE_SLASH_EXAMPLE, ""))
+                ):
+                    continue
+                problems.append(f"{rel(path)}:{number}: {reason}: {line.strip()}")
+    # The init step that installs the rule must itself take it from the resolver; a mention in
+    # the status section alone does not count.
+    lifecycle = read_text(REFERENCES_DIR / "lifecycle.md") or ""
+    start = lifecycle.find("### 4. 권한 규칙 제안")
+    end = lifecycle.find("\n### ", start + 1) if start >= 0 else -1
+    init_step = lifecycle[start:end if end >= 0 else None] if start >= 0 else ""
+    if "--permission-rule" not in init_step:
+        problems.append(
+            f"{rel(REFERENCES_DIR / 'lifecycle.md')}: init step '### 4. 권한 규칙 제안' does not take the rule "
+            "from resolve-vault.py --permission-rule"
+        )
+    if problems:
+        return bad(f"{len(problems)} permission rule leftover(s)", problems)
+    return ok("lifecycle.md takes the vault rule and settings path from resolve-vault.py --permission-rule")
+
+
 # Issue #9: without a stated signal the model defaults to interactive and ends the
 # headless turn at the gate. The signals must be tool-free (Bash env reads can be denied).
 HEADLESS_SIGNALS = ("### 헤드리스 판별", "Claude Agent SDK", "AskUserQuestion")
@@ -1769,6 +1817,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("E", "schema: profile.md six blocks in order", check_profile_blocks),
     ("E", "schema: shipped .data is a blank seed", check_data_is_empty_seed),
     ("E", "vault: {VAULT} comes from resolve-vault.py", check_vault_resolver_wiring),
+    ("E", "vault: permission rule is ~/ or // in the resolved settings", check_permission_rule_format),
     ("F", "v2: no --deep mode in SKILL.md", check_no_deep_flag),
     ("F", "v2: SKILL.md frontmatter has no effort/argument-hint", check_skill_frontmatter_clean),
     ("F", "v2: no legacy prefix alias mapping", check_no_legacy_prefix_aliases),

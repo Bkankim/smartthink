@@ -11,6 +11,10 @@ as-is; it never re-derives the path from prose. Precedence:
 3. The default ~/.claude/smartthink-vault.
 
 Output: {"path": "<absolute path>", "source": "env|pointer|default"}
+--permission-rule adds "permission_rule" (the Edit allow rule `st init` installs for the vault) and
+"settings_path" (${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json, the file it goes into), plus
+"permission_rule_effective": false when the vault sits under ~/.claude, which Claude Code treats as
+sensitive and keeps prompting for whatever the allow rules say.
 --ensure also creates packs/ and copies the evolution-state template when absent. profile.md is
 left to `st init`.
 Existing files are never overwritten.
@@ -67,6 +71,35 @@ def resolve() -> tuple[Path, str]:
     return default_vault(), "default"
 
 
+def permission_rule(vault: Path) -> str:
+    # A rule path starting with a single / is relative to the settings file, so it never matches an
+    # absolute vault (issue #14). Use ~/ under the home directory and // (absolute) elsewhere.
+    home = Path.home()
+    try:
+        relative = vault.relative_to(home)
+    except ValueError:
+        return f"Edit(//{str(vault).lstrip('/')}/**)"
+    return "Edit(~/**)" if relative == Path(".") else f"Edit(~/{relative.as_posix()}/**)"
+
+
+def rule_is_effective(vault: Path) -> bool:
+    # Claude Code prompts for every write under $HOME/.claude ("a sensitive file") even when an
+    # allow rule matches, and this follows HOME, not CLAUDE_CONFIG_DIR (issue #14 probes P1-P6).
+    # Compare real paths so a vault reached through a symlink into ~/.claude is still caught.
+    try:
+        Path(os.path.realpath(vault)).relative_to(os.path.realpath(Path.home() / ".claude"))
+    except ValueError:
+        return True
+    return False
+
+
+def settings_path() -> Path:
+    # Claude Code reads user settings from CLAUDE_CONFIG_DIR when it is set, not from ~/.claude.
+    config_dir = (os.environ.get("CLAUDE_CONFIG_DIR") or "").strip()
+    base = Path(config_dir).expanduser() if config_dir else Path.home() / ".claude"
+    return Path(os.path.abspath(base)) / "settings.json"
+
+
 def ensure(vault: Path) -> None:
     (vault / "packs").mkdir(parents=True, exist_ok=True)
     for name in SEED_FILES:
@@ -78,6 +111,11 @@ def ensure(vault: Path) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Print the resolved SmartThink vault as JSON.")
     parser.add_argument("--ensure", action="store_true", help="create packs/ and seed a missing evolution-state.md")
+    parser.add_argument(
+        "--permission-rule",
+        action="store_true",
+        help="also print the vault Edit allow rule and the settings.json it belongs in",
+    )
     arguments = parser.parse_args()
     vault, source = resolve()
     if arguments.ensure:
@@ -86,7 +124,12 @@ def main() -> int:
         except OSError as error:
             print(f"error: cannot prepare vault {vault}: {error}", file=sys.stderr)
             return 1
-    print(json.dumps({"path": str(vault), "source": source}, ensure_ascii=False))
+    result = {"path": str(vault), "source": source}
+    if arguments.permission_rule:
+        result["permission_rule"] = permission_rule(vault)
+        result["settings_path"] = str(settings_path())
+        result["permission_rule_effective"] = rule_is_effective(vault)
+    print(json.dumps(result, ensure_ascii=False))
     return 0
 
 
