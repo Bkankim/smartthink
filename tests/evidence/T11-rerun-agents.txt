@@ -1,0 +1,31 @@
+## 명령: claude --model opus -p '<Agent subagent_type 이름 목록 출력>' (실제 HOME, 새 세션)
+ai-tell-detector
+claude
+content-fidelity-auditor
+Explore
+general-purpose
+humanize-monolith
+humanize-web-architect
+korean-ai-tell-taxonomist
+korean-style-rewriter
+korean-translation-scholar
+naturalness-reviewer
+ocx-claude-opus-4-8
+ocx-claude-opus-5-5
+ocx-gpt-5-6-sol
+ocx-grok-4-6
+ocx-self
+Plan
+post-editese-metric-engineer
+quick-rules-integrator
+st-armorer
+st-thinker
+statusline-setup
+taxonomy-gap-analyzer
+translationese-research-distiller
+exit=0
+
+## st-thinker 정의 확인
+readlink ~/.claude/agents/st-thinker.md -> [REDACTED]/workspace/smartthink/agents/st-thinker.md (v3, STSA 표식 0)
+## 실제 기본 vault find -newer 마커: (비어 있음)
+## 임시 env vault 내용: evolution-state.md, packs/ (resolver --ensure 시드)
