@@ -128,4 +128,47 @@ SKILL Base directory for this skill: <HOME>/workspace/smartthink-fix-26-main-bas
 ## 판정: PASS
 
 - init 승인 뒤 새 세션 무장 2회(`--digest` 1, 원문 1) 모두 권한 프롬프트 0회. T16-before의 10회(스킬 디렉터리 Read 9, resolver Bash 1)가 사라졌다.
-- 남은 한계(범위 밖, 실측 안 함): install.sh 심링크 설치는 `{SKILL_DIR}`이 `~/.claude/skills/smartthink` 심링크라 `readlink` 한 줄이 남고, Read 규칙은 `{SCRIPTS_DIR}` 기준 실제 경로로 만들어진다. 그 조합의 프롬프트 여부는 재지 않았다. 리서치 ON의 WebSearch·WebFetch는 이번 측정에서 사전 허용했다(측정 대상 아님).
+- 리서치 ON의 WebSearch·WebFetch는 이번 측정에서 사전 허용했다(측정 대상 아님).
+
+## 4. install.sh 설치 (final-review 20260927-064432 (c) 후속)
+
+- 환경: 위와 같은 격리 조건에서 플러그인 대신 `install.sh`로 설치했다. `git archive`로 푼 사본 `<ROOT>/src`에서 `HOME=<ROOT>/home bash ./install.sh`를 돌려 가짜 홈의 `~/.claude/skills/smartthink` → `<ROOT>/src/skills/smartthink`, `~/.claude/agents/st-*.md` 링크를 만들었다(실제 `~/.claude`는 건드리지 않음). `CLAUDE_CONFIG_DIR=<ROOT>/home/.claude`(Claude Code가 사용자 레벨 스킬을 읽는 위치), `--plugin-dir` 없이 `claude --model opus --permission-mode default`, 호출은 `/smartthink`. 두 세션 jsonl의 스킬 로드 줄은 `Base directory for this skill: <ROOT>/home/.claude/skills/smartthink`다.
+- 절차: `/smartthink init`(⑤ `~/notes` 후보 → 규칙 `전부`) → 새 세션 `/smartthink --nosearch 동네 도서관 스터디룸 예약 노쇼 줄이기` → `진행`.
+
+| 행 | 코드 | init이 설치한 Read 규칙 | 무장 프롬프트 | 내역 |
+|---|---|---|---|---|
+| install.sh 설치(수정 전) | 202a213 | `Read(//<ROOT>/src/skills/smartthink/**)` 1개 | **9** | 메인 Read `~/.claude/skills/smartthink/references/index.json` 1, armorer Read 같은 링크 경로의 모듈 8 |
+| install.sh 설치(수정 후) | 3b995c4 | `Read(//<ROOT>/src/skills/smartthink/**)`, `Read(~/.claude/skills/smartthink/**)` | **0** | 팩 `--pack` H 5/5 |
+
+- 원인: 세션은 `{SKILL_DIR}`(링크 경로)로 Read하고 Claude Code는 그 경로 문자열로 Read 규칙을 본다. 체크아웃 실경로 규칙만으로는 매칭되지 않았다. 수정 후 `resolve-vault.py --permission-rule`의 `read_rules`가 그 경로로 풀리는 사용자 레벨 `skills/smartthink` 링크 규칙을 더한다.
+- 일치한 것: 메인의 `readlink ~/.claude/skills/smartthink` 한 줄은 수정 전후 모두 프롬프트가 없었다. 그 결과로 만든 `{SCRIPTS_DIR}`(`<ROOT>/src/scripts`)로 친 `resolve-vault.py --ensure`와 armorer의 `assemble-pack.py`는 `bash_rules`·`command_prefixes`와 글자 그대로 일치해 무프롬프트였다. `{SKILL_DIR}/../../scripts`를 문자열로 만들면 `~/.claude/scripts`라는 엉뚱한 경로가 되지만, 두 런 모두 SKILL.md 규약대로 readlink를 거쳐 그 경로는 쓰이지 않았다.
+- 두 규칙이 모두 필요한 근거: 수정 후 런에서 armorer는 Path Variables의 `SKILL_DIR`을 실경로로 받아 `<ROOT>/src/skills/smartthink/references/*`를 Read했고, 수정 전 런에서는 링크 경로로 Read했다(모델이 넘기는 문자열이 런마다 다르다).
+
+수정 후 도구 호출(세션 jsonl 추출, 시각 UTC):
+
+```
+== main 4cc36d75-a2f7-41ea-b5fd-360acaa58614.jsonl
+SKILL Base directory for this skill: <ROOT>/home/.claude/skills/smartthink
+22:13:56 Bash: readlink <ROOT>/home/.claude/skills/smartthink
+22:13:57 Bash: python3 <ROOT>/src/scripts/resolve-vault.py --ensure
+22:13:59 Read: <ROOT>/home/notes/smartthink/profile.md
+22:14:00 Read: <ROOT>/home/notes/smartthink/evolution-state.md
+22:14:00 Read: <ROOT>/home/.claude/skills/smartthink/references/index.json
+22:15:29 Agent: st-armorer
+22:19:37 Read: <ROOT>/home/notes/smartthink/packs/2026-09-27-library-studyroom-noshow/pack.md
+== armorer agent-a60e62be657a3fb01.jsonl
+22:15:32 Read: <ROOT>/src/skills/smartthink/references/core-engines.md
+22:15:33 Read: <ROOT>/src/skills/smartthink/references/cognitive-arsenal.md
+22:15:33 Read: <ROOT>/src/skills/smartthink/references/execution-velocity.md
+22:15:34 Read: <ROOT>/src/skills/smartthink/references/triz-innovation.md
+22:15:35 Read: <ROOT>/src/skills/smartthink/references/pattern-synthesis.md
+22:15:35 Read: <ROOT>/src/skills/smartthink/references/analysis-method.md
+22:15:39 Read: <ROOT>/src/skills/smartthink/references/core-engines.md
+22:15:41 Read: <ROOT>/src/skills/smartthink/references/cognitive-arsenal.md
+22:17:09 Bash: date +%Y-%m-%dT%H:%M:%S%z
+22:19:18 Write: <ROOT>/home/notes/smartthink/packs/2026-09-27-library-studyroom-noshow/pack.md
+22:19:22 Bash: python3 <ROOT>/src/scripts/assemble-pack.py --pack-dir "<ROOT>/home/notes/smartthink/packs/2026-09-27-library-studyroom-noshow/" --modules core-engines.md cognitive-arsenal.md execution-velocity.md triz-innovation.md pattern-synth
+22:19:29 Write: <ROOT>/home/notes/smartthink/packs/2026-09-27-library-studyroom-noshow/manifest.json
+```
+
+수정 전 런의 메인 첫 줄은 같은 `readlink`, 그다음 `resolve-vault.py --ensure`(무프롬프트), `Read ~/.claude/skills/smartthink/references/index.json`(프롬프트)이었고, 메인이 `smartthink:st-armorer` not found 뒤 bare `st-armorer`로 재시도했다(플러그인이 아닌 설치의 이름 해석 규칙대로).
