@@ -247,7 +247,7 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 - **입력**:
   ```bash
   export ST_EMPTY="$(mktemp -d)"; touch "$TMPDIR/st14-marker"
-  python3 scripts/resolve-vault.py            # 단위 확인: source가 env여야 한다
+  SMARTTHINK_VAULT="$ST_EMPTY" python3 scripts/resolve-vault.py   # 단위 확인: source가 env여야 한다
   SMARTTHINK_VAULT="$ST_EMPTY" claude --plugin-dir . -p '/smartthink:smartthink --nosearch 지역 도서관 좌석 안내를 개선해줘'
   find ~/.claude/smartthink-vault -newer "$TMPDIR/st14-marker"
   ```

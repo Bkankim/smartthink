@@ -283,8 +283,9 @@ Behavior in a degraded environment is fixed, not improvised.
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code). Sub-agent support gets you the
   armorer path; without it you get the inline path, which produces the same pack.
-- Python 3 for `scripts/build-index.py` and `scripts/check-structure.py`. Neither is needed to
-  *use* SmartThink, only to develop it.
+- Python 3. SmartThink runs `scripts/resolve-vault.py` to find the vault, and `install.sh` needs it
+  for that and for the leftover check. `uninstall.sh` still removes its links without it.
+  `scripts/build-index.py` and `scripts/check-structure.py` are only for development.
 - macOS or Linux for `install.sh` (on Windows use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/)).
   The plugin route has no such restriction.
 - Optional: the `insane-search` skill, for sources that block plain fetches. Without it those
