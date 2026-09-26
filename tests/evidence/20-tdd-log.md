@@ -218,3 +218,11 @@ FAILED tests/test_resolve_vault.py::ResolveVaultTest::test_relative_claude_confi
 E               AssertionError: True is not false
 FAILED tests/test_resolve_vault.py::ResolveVaultTest::test_rule_under_protected_folders_is_not_effective
 ```
+
+## 후속 완료 기준 출력 (1b01df4 이후 작업 트리)
+
+```
+python3 scripts/check-structure.py -> exit=0, 38 passed, 0 failed, 5 skipped (D. wiring 11개 전부 PASS)
+uv run --with pytest pytest -q tests -> 76 passed, 25 subtests passed
+git diff (병합 d104727 기준) 추가 em dash 0, 토큰 흔적 grep 0
+```
