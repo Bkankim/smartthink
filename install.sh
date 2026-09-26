@@ -8,7 +8,7 @@ COMMANDS_SOURCE="$SCRIPT_DIR/commands"
 SKILL_TARGET="$HOME/.claude/skills/smartthink"
 AGENTS_TARGET="$HOME/.claude/agents"
 COMMANDS_TARGET="$HOME/.claude/commands"
-VAULT="${SMARTTHINK_VAULT:-$HOME/.claude/smartthink-vault}"
+RESOLVER="$SCRIPT_DIR/scripts/resolve-vault.py"
 AGENT_FILES=(st-thinker.md st-armorer.md)
 COMMAND_FILES=(st.md)
 
@@ -19,7 +19,6 @@ echo "Skill source   : $SKILL_SOURCE"
 echo "Skill target   : $SKILL_TARGET"
 echo "Agents target  : $AGENTS_TARGET"
 echo "Commands target: $COMMANDS_TARGET"
-echo "Vault          : $VAULT"
 echo ""
 
 # Check source exists
@@ -100,17 +99,18 @@ for f in "${COMMAND_FILES[@]}"; do
   echo "Command linked : $target -> $COMMANDS_SOURCE/$f"
 done
 
-# 4. Vault (lives OUTSIDE the repo so your profile and insights never get committed)
-mkdir -p "$VAULT/packs"
-if [ ! -f "$VAULT/evolution-state.md" ]; then
-  cp "$SKILL_SOURCE/.data/evolution-state.md" "$VAULT/evolution-state.md"
-  echo "Vault seeded   : $VAULT/evolution-state.md (empty template)"
-else
-  echo "Vault kept     : $VAULT/evolution-state.md (existing insights preserved)"
+# 4. Vault (lives OUTSIDE the repo so your profile and insights never get committed).
+# scripts/resolve-vault.py owns the path rules and the seeding; this script only reports.
+# profile.md is intentionally NOT seeded: its absence is the signal that tells SmartThink to
+# suggest /st init, which is what actually fills the profile in.
+if ! VAULT_JSON="$(python3 "$RESOLVER" --ensure)"; then
+  echo "ERROR: could not prepare the vault (see the message above)."
+  exit 1
 fi
+VAULT="$(printf '%s' "$VAULT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["path"])')"
+VAULT_SOURCE="$(printf '%s' "$VAULT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["source"])')"
+echo "Vault          : $VAULT (from $VAULT_SOURCE)"
 echo "Packs dir      : $VAULT/packs"
-# profile.md is intentionally NOT seeded here. Its absence is the signal that tells
-# SmartThink to suggest /st init, which is what actually fills the profile in.
 
 echo ""
 echo "Installation complete!"
