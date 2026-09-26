@@ -32,6 +32,13 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 쓰고, 여기서 우선순위를 다시 해석하지 마라. `--ensure`가 `packs/`와 빈 `evolution-state.md`를
 만든다. `profile.md`는 시드하지 않는다. 없는 것이 `/st init` 안내 신호이고, init 3단계가 만든다.
 
+- 우선순위는 `SMARTTHINK_VAULT` > 포인터 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer` >
+  기본값 `${XDG_DATA_HOME:-~/.local/share}/smartthink`이다(설명용, 적용은 resolver만 한다). 기본값이
+  `~/.claude` 밖인 이유는 Claude Code가 `~/.claude` 아래 쓰기를 허용 규칙과 무관하게 묻기 때문이다.
+- init을 거치지 않은 세션(헤드리스 포함)은 후보 탐지를 하지 않는다. resolver가 낸 경로(포인터가
+  없으면 기본값)를 `--ensure`로 만들어 그대로 쓴다.
+- 예외: init은 2단계 ⑤에서 경로가 확정되기 전까지 resolver를 `--ensure` 없이 실행한다(⑤ 0번).
+
 - 이미 있는 파일은 **덮어쓰지 않는다.** resolver도 존재 확인 후에만 복사한다.
 - **`.data/` 자체를 사용자 상태 저장소로 쓰지 않는다.** 플러그인 디렉터리는 업데이트 때 통째로
   교체될 수 있다. 읽고 쓰는 대상은 언제나 `{VAULT}` 아래의 사본이다.
@@ -77,6 +84,8 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 - **타 런타임의 설정 디렉터리(`~/.codex` 등)는 스캔 대상이 아니다.** 목록에 없는 경로는 열지 않는다.
 - 각 항목이 **없어도 실패하지 않는다.** 파일이 없거나, git 리포가 아니거나, 읽기 권한이 없으면
   그 항목만 건너뛰고 "없음"으로 기록한다.
+- 2단계 ⑤의 vault 후보 탐지는 이 스캔이 아니다. `resolve-vault.py --candidates`가 홈 아래 폴더
+  이름·표시 파일 유무·수정 시각만 보고 파일 내용은 읽지 않는다. 그 결과를 이 스캔 요약에 섞지 마라.
 - 스캔 결과는 **요약으로만** `profile.md`에 남긴다. **원문을 복사해 오지 않는다.** 지침 파일
   전문이나 커밋 메시지 뭉치를 프로필에 붙여넣지 마라. 프로필은 1~2K 토큰 예산이다.
 
@@ -125,21 +134,42 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 - 지어내지 마라. 근거 없는 추정보다 `_(미설정)_`이 낫다. 무장 파이프라인은 미설정 항목을
   조용히 건너뛴다.
 
-**⑤ vault 경로**는 기존 vault가 있으면 그 안 `smartthink/`를 제안하는 규칙을 따른다.
+**⑤ vault 경로**는 결정적 탐지 결과를 보여 주고 **사용자가 고른다. 자동 선택 금지.**
 
-- 기존에 쓰는 vault(Obsidian 등)가 스캔이나 대화에서 확인되면 그 안의 `smartthink/`를 제안한다.
-  예: `노트 vault가 ~/notes에 있는데, ~/notes/smartthink를 쓸까? (Enter = 수락)`
-- 없으면 기본값 `~/.claude/smartthink-vault`를 제안한다.
-- 어느 쪽이든 **기존 vault를 훼손하지 않는다.** `profile.md`와 `packs/`만 추가한다.
-- 확정된 경로가 이후 이 세션의 `{VAULT}`다.
-- **다음 세션이 그 경로를 찾게 하는 것은 포인터다.** profile.md의 vault 경로 필드는 표시용이고
-  resolver는 읽지 않는다. 3단계 최종 승인 뒤 아래를 수행한다.
-  - resolver의 `source`가 `env`면 포인터를 쓰지 않는다. env가 항상 이긴다고 알리고, 확정 경로가
-    env와 다르면 `SMARTTHINK_VAULT`를 셸 프로필에서 바꾸라고 안내한다.
-  - 확정 경로가 기본값이 아니면 `~/.claude/smartthink-vault/vault-pointer`에 절대경로 한 줄을
-    Write한다(디렉터리가 없으면 `mkdir -p`).
-  - 확정 경로가 기본값인데 `vault-pointer`가 있으면 `vault-pointer.bak`으로 이름을 바꿔 무력화한다.
-  - 마지막으로 resolver를 다시 실행해 `path`가 확정 경로와 같은지 확인하고, 다르면 보고한다.
+0. init은 ⑤에서 경로가 확정되기 전에는 resolver를 `--ensure` 없이 실행한다. 기본 위치에 빈 vault를 미리
+   만들면 다른 곳을 고른 뒤 쓰이지 않는 폴더가 남는다. 시드는 경로 확정 뒤 `--ensure`로 한다.
+1. `python3 "{SCRIPTS_DIR}/resolve-vault.py" --candidates`를 실행한다. JSON의 `candidates[]`가 기존
+   노트 보관소 후보이고 `create_new.path`가 새로 만들기(기본값)다. 탐지를 직접 흉내 내지 마라.
+2. 후보를 번호 목록으로 보여 준다. 후보마다 `path`, `signals`(등록 목록·표시 파일·이름), `last_modified`,
+   `file_count`(대략), `git_repo`, `warnings`를 한 줄로 붙인다. 경고는 풀어서 쓴다. `stale`은 180일 넘게
+   수정 없음, `nearly-empty`는 파일이 거의 없음(안 쓰는 기본 vault일 수 있음), `workspace-root`는 코드
+   리포를 여럿 담은 작업 폴더 루트다. `special-characters`는 경로에 `[ ] * ? { } ( )`가 있어 권한 규칙이
+   매칭되지 않을 수 있다는 뜻이다(4절에서 규칙을 제안하지 않게 된다). `partial`은 시간 상한·파일 수 상한(5000)·
+   읽기 실패로 집계가 끊겨 `stale`·`nearly-empty`를 판단하지 않았다는 뜻이다. `scan.timed_out`이 `true`면 탐색이 시간 상한에서 멈춰 목록이
+   불완전하다고 알린다. 목록 끝에 **"새로 만들기(기본값) `<create_new.path>`"**와 **"직접 입력"**을 둔다.
+3. **어느 것도 미리 골라 두지 마라.** 이 문항만은 Enter 수락 기본값을 붙이지 않는다. 신호가 가장 많거나
+   경고가 없는 후보라도 "추천"·"(Enter = 수락)"으로 표시하지 않는다. 후보가 0개면 새로 만들기와 직접
+   입력만 보여 주고 묻는다. 건너뛰면 새로 만들기(기본값)로 둔다.
+4. 노트 보관소 후보를 고르면 루트가 아니라 그 후보의 `suggested_vault`(`<보관소>/smartthink/`)를 쓴다.
+   **기존 파일은 건드리지 않는다.** `profile.md`와 `packs/`만 그 아래에 추가한다.
+5. 직접 입력한 경로는 절대경로로 받는다. 경로가 `~/.claude` 아래이거나 경로 안에 `.claude`·`.git`·`.vscode`·`.idea`
+   폴더가 있으면 경고한다. Claude Code가 그 아래 쓰기를 보호 경로로 보고 허용 규칙과 무관하게 매번
+   묻는다. 사용자가 그래도 쓰겠다고 하면 그대로 쓴다. 노트 보관소 루트를 입력했으면 `<입력>/smartthink/`를
+   쓸지 한 번 묻는다.
+6. 고른 경로가 git 리포 안이면(후보의 `git_repo`, 직접 입력이면 홈 아래 상위 폴더에 `.git`이 있는지. 홈 자체의 `.git` 닷파일 리포는 치지 않는다) `packs/`를 그
+   리포의 `.gitignore`에 넣을지 **묻는다**. 팩은 모듈 원문 사본이라 다시 만들 수 있는 캐시다.
+   `profile.md`·`evolution-state.md`는 git에 두면 여러 머신이 공유한다. 승인했을 때만 `.gitignore`에
+   `<리포 기준 경로>/packs/` 한 줄을 추가한다(파일이 있으면 기존 내용 보존, 이미 있으면 추가하지 않음).
+7. 확정된 경로가 이후 이 세션의 `{VAULT}`다.
+8. **다음 세션이 그 경로를 찾게 하는 것은 포인터다.** profile.md의 vault 경로 필드는 표시용이고
+   resolver는 읽지 않는다. 3단계 최종 승인 뒤 아래를 수행한다.
+   - resolver의 `source`가 `env`면 포인터를 쓰지 않는다. env가 항상 이긴다고 알리고, 확정 경로가
+     env와 다르면 `SMARTTHINK_VAULT`를 셸 프로필에서 바꾸라고 안내한다.
+   - 확정 경로가 `create_new.path`(기본값)가 아니면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`에
+     절대경로 한 줄을 Write한다(디렉터리가 없으면 `mkdir -p`).
+   - 확정 경로가 기본값이면 포인터를 쓰지 않는다. 이미 포인터가 있으면 resolver가 계속 그쪽을
+     고르므로, 가리키는 경로를 보여 주고 지울지 **묻는다**. 승인했을 때만 지운다.
+   - 마지막으로 resolver를 다시 실행해 `path`가 확정 경로와 같은지 확인하고, 다르면 보고한다.
 
 ### 3. `profile.md` 각인
 
@@ -168,16 +198,26 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
   (슬래시 두 개 + 앞 `/`를 뺀 절대경로)다.
 - **단일 `/`로 시작하는 `Edit(/<절대경로>/**)`를 쓰지 마라.** Claude Code는 `/`로 시작하는 규칙
   경로를 설정 파일 기준 상대경로로 해석하므로 vault와 매칭되지 않고 프롬프트가 그대로 뜬다(#14).
-- **`permission_rule_effective`가 `false`면 규칙을 제안하지 마라.** vault가 `~/.claude` 아래(기본값
-  `~/.claude/smartthink-vault` 포함)면 Claude Code가 그 아래 쓰기를 민감 파일로 보고 허용 규칙과
-  무관하게 매번 묻는다. 규칙을 넣어도 프롬프트가 사라지지 않으니 설치하지 말고 이렇게 알린다.
+- **`settings_path`가 `null`이면 규칙을 제안하지 마라.** `CLAUDE_CONFIG_DIR`가 상대경로라서 이 세션이 읽는
+  설정 파일을 resolver가 알 수 없다는 뜻이다(#23). 설치하지 말고 "`CLAUDE_CONFIG_DIR`를 절대경로로 지정한 뒤
+  init을 다시 실행하면 규칙 설치를 다시 묻는다"고 알린다. Bash 조립 규칙도 같은 파일에 들어가므로 함께 뺀다.
+- **`permission_rule_effective`가 `false`면 규칙을 제안하지 마라.** 규칙을 넣어도 프롬프트가 사라지지 않는다.
+  설치하지 말고 `permission_rule_reason`에 맞춰 이유와 대안을 알린다.
+  - `home-claude`: vault가 `~/.claude` 아래다. Claude Code가 그 아래 쓰기를 민감 파일로 보고 허용 규칙과 무관하게
+    매번 묻는다.
+  - `protected-folder`: vault 경로에 `.claude`·`.git`·`.vscode`·`.idea` 폴더가 있다. 리포 안이든 밖이든 Claude
+    Code가 그 아래 쓰기를 민감 파일로 보고 매번 묻는다(#20 헤드리스 탐침).
+  - `special-characters`: vault 경로에 `[ ] * ? { } ( )` 같은 glob·규칙 문법 문자가 있어 규칙이 vault와 매칭되지
+    않을 수 있다(#23). 규칙 문자열은 이스케이프하지 않는다.
 
   ```
-  vault가 ~/.claude 아래라서 Claude Code가 팩 쓰기마다 확인을 받는다(허용 규칙으로 못 없앰).
-  프롬프트를 없애려면 /st init을 다시 실행해 2절에서 ~/.claude 밖 경로를 고르거나,
-  SMARTTHINK_VAULT로 ~/.claude 밖 경로를 지정하면 된다. 그대로 둬도 무장은 동작한다.
-  세션 중에는 프롬프트의 "allow Claude to edit files in its ~/.claude folder for this session"로 넘길 수 있다.
+  vault 위치 때문에 허용 규칙으로 팩 쓰기 확인을 없앨 수 없다(<이유 한 줄>).
+  프롬프트를 없애려면 /st init을 다시 실행해 2절에서 그런 폴더·문자가 없는 경로를 고르거나,
+  SMARTTHINK_VAULT로 그런 경로를 지정하면 된다. 그대로 둬도 무장은 동작한다.
   ```
+
+  `home-claude`면 세션 중에는 프롬프트의 "allow Claude to edit files in its ~/.claude folder for this session"로
+  넘길 수 있다고 덧붙인다.
 
 - `true`일 때만 설치 여부를 **묻는다.**
 
@@ -421,9 +461,9 @@ v2 형식(YAML 헤더 없음)이면 그 사실을 표시하고 "첫 `/st retain`
 | 에이전트 정의 `st-thinker` | 현재 세션 에이전트 목록에 `smartthink:st-thinker` 또는 `st-thinker` | `--report`가 general-purpose + `thinker-prompt.md` 폴백으로 내려감 |
 | Agent 도구 사용 가능 | 현재 세션의 도구 목록 | 인라인 경로로 동작한다. 리서치가 메인 컨텍스트를 소모하고 게이트에 비용이 표시됨 |
 | 사용자 레벨 옛 설치 잔재 | `python3 "{SCRIPTS_DIR}/legacy-install.py" detect` 출력이 비어 있음 | 복사 설치된 옛 파일이나 옛 체크아웃을 가리키는 링크가 bare 이름(`/st`, `/smartthink`, `st-thinker`)을 선점해 이 버전 대신 열림 |
-| vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고 1줄 표시 |
+| vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고, `pointer`면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`가 가리킨 경로라고, `default`면 `${XDG_DATA_HOME:-~/.local/share}/smartthink`이라고 1줄 표시 |
 | vault 쓰기 가능 | **디렉터리 권한으로 판정**(`test -w {VAULT}`) | 팩·프로필·진화 상태가 기록되지 않음 |
-| 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: vault가 `~/.claude` 아래라 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 ~/.claude 밖 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소 |
+| 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`거나 `settings_path`가 `null`이면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: `permission_rule_reason`대로 표시(`home-claude` vault가 `~/.claude` 아래, `protected-folder` 경로에 `.claude`·`.git`·`.vscode`·`.idea` 폴더, `special-characters` 경로에 glob·규칙 문법 문자). 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 그런 폴더·문자가 없는 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소. `settings_path=null`: `CLAUDE_CONFIG_DIR`가 상대경로, 절대경로로 지정하고 init 재실행 |
 | 권한 규칙(Bash 조립) | `python3 {SCRIPTS_DIR}/assemble-pack.py --permission-rule`(`{SCRIPTS_DIR}`는 경로 규약 문자열 그대로)의 `permission_rule`과 같은 항목(또는 init 4절 7번의 동등한 `:*` 표기)이 `settings_path`의 `permissions.allow`에 있으면 OK. 없거나 다른 경로의 `assemble-pack.py`만 가리키면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음·다른 경로: 무장마다 armorer의 5절 조립 Bash에 승인 프롬프트가 뜸(플러그인 업데이트로 경로가 바뀐 경우 포함), `/st init` 재실행으로 설치. `effective=false`: 스크립트 경로에 공백·셸 특수 문자가 있어 규칙이 매칭되지 않음, 그런 문자가 없는 경로에 설치하면 해소 |
 | `references/index.json` | 파일 존재 | 게이트의 비용 추정이 사전 계산값 대신 실측 근사로 내려감 |
 | 검색 도구 | WebSearch·WebFetch 사용 가능 여부 | 팩 3절(리서치 합성) 생략, `manifest.research=false` |
@@ -441,6 +481,8 @@ NG 항목이 있으면 **무엇을 하면 되는지 1줄씩** 붙인다. 전부 
   권한 규칙 없음        /st init 을 다시 돌리면 규칙 설치를 다시 물어봄 (거절해도 동작함)
   권한 규칙 형식 틀림   단일 / 규칙은 매칭 안 됨. /st init 을 다시 돌려 ~/ 또는 // 형식 규칙을 설치
   vault가 ~/.claude 아래  팩 쓰기마다 확인이 뜸(규칙으로 못 없앰). /st init 에서 vault를 ~/.claude 밖으로 옮기면 해소
+  vault가 보호 폴더 아래  .claude·.git·.vscode·.idea 폴더 아래라 팩 쓰기마다 확인이 뜸. /st init 에서 그런 폴더 밖 경로를 고르면 해소
+  CLAUDE_CONFIG_DIR 상대경로  설치할 설정 파일을 알 수 없음. CLAUDE_CONFIG_DIR를 절대경로로 지정하고 /st init 재실행
   팩 23개 (상한 20)     {VAULT}/packs/ 에서 오래된 3개를 지울지 확인 (자동 삭제하지 않음)
   옛 설치 잔재          SmartThink 클론에서 ./install.sh --migrate-legacy (플러그인 설치면 ./uninstall.sh --migrate-legacy). 복사본은 ~/.claude/.backup/ 으로 이동만 되고, 옛 체크아웃 링크는 옵션 없이도 교체·제거됨
   st-armorer 없음       install.sh 사용자는 클론에서 ./install.sh 재실행, 플러그인 사용자는 플러그인 재설치
