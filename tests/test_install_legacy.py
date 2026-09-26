@@ -37,9 +37,10 @@ class InstallerTestCase(unittest.TestCase):
     def tearDown(self) -> None:
         self._tmp.cleanup()
 
-    def run_script(self, script: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    def run_script(self, script: Path, *args: str, **extra: str) -> subprocess.CompletedProcess[str]:
         env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
         env["HOME"] = str(self.home)
+        env.update(extra)
         return subprocess.run(
             ["bash", str(script), *args], env=env, capture_output=True, text=True, check=False
         )
@@ -209,6 +210,28 @@ class InstallTest(InstallerTestCase):
         self.assertEqual(completed.returncode, 1, completed.stdout)
         self.assertFalse(os.path.lexists(self.claude / "skills" / "smartthink"))
 
+    def test_install_does_not_create_the_default_vault(self) -> None:
+        # /st init picks the vault (step 5); seeding the default first would leave an unused folder.
+        completed = self.run_script(INSTALL)
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertTrue(os.path.lexists(self.claude / "skills" / "smartthink"))
+        self.assertFalse((self.home / ".local" / "share" / "smartthink").exists())
+
+    def test_read_only_vault_parent_stops_before_any_link(self) -> None:
+        # The writability guard stays: the nearest existing ancestor of the vault must be writable.
+        locked = self.home / "locked"
+        locked.mkdir()
+        locked.chmod(0o555)
+        try:
+            completed = self.run_script(INSTALL, SMARTTHINK_VAULT=str(locked / "a" / "vault"))
+        finally:
+            locked.chmod(0o755)
+
+        self.assertEqual(completed.returncode, 1, completed.stdout)
+        self.assertFalse(os.path.lexists(self.claude / "skills" / "smartthink"))
+        self.assertFalse((locked / "a").exists())
+
     def test_current_alias_copy_is_not_a_leftover(self) -> None:
         (self.claude / "commands" / "st.md").write_bytes((REPO_ROOT / "commands" / "st.md").read_bytes())
 
@@ -253,6 +276,18 @@ class UninstallTest(InstallerTestCase):
         pointer.write_text(str(self.home / "notes") + "\n", encoding="utf-8")
 
         completed = self.run_script(UNINSTALL)
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn(str(pointer), completed.stdout)
+
+    def test_pointer_hint_follows_xdg_config_home_like_the_resolver(self) -> None:
+        # The resolver strips whitespace around XDG_CONFIG_HOME; the pointer hint must look in the same place.
+        config = self.home / "cfg"
+        pointer = config / "smartthink" / "vault-pointer"
+        pointer.parent.mkdir(parents=True)
+        pointer.write_text(str(self.home / "notes") + "\n", encoding="utf-8")
+
+        completed = self.run_script(UNINSTALL, XDG_CONFIG_HOME=f" {config} ")
 
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
         self.assertIn(str(pointer), completed.stdout)

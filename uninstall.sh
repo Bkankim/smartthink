@@ -108,8 +108,10 @@ echo "Uninstall complete."
 echo "Your profile, evolution state and packs are preserved in $VAULT"
 echo "Delete that directory manually if you want a full reset."
 # Same location scripts/resolve-vault.py reads (XDG_CONFIG_HOME only when absolute, per the XDG spec).
-case "${XDG_CONFIG_HOME:-}" in
-  /*) POINTER="$XDG_CONFIG_HOME/smartthink/vault-pointer" ;;
+# Strip surrounding whitespace first, as the resolver does.
+XCH="$(printf '%s' "${XDG_CONFIG_HOME:-}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+case "$XCH" in
+  /*) POINTER="$XCH/smartthink/vault-pointer" ;;
   *) POINTER="$HOME/.config/smartthink/vault-pointer" ;;
 esac
 if [ -f "$POINTER" ]; then

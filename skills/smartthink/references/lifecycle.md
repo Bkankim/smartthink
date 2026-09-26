@@ -143,7 +143,9 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 2. 후보를 번호 목록으로 보여 준다. 후보마다 `path`, `signals`(등록 목록·표시 파일·이름), `last_modified`,
    `file_count`(대략), `git_repo`, `warnings`를 한 줄로 붙인다. 경고는 풀어서 쓴다. `stale`은 180일 넘게
    수정 없음, `nearly-empty`는 파일이 거의 없음(안 쓰는 기본 vault일 수 있음), `workspace-root`는 코드
-   리포를 여럿 담은 작업 폴더 루트다. `scan.timed_out`이 `true`면 탐색이 시간 상한에서 멈춰 목록이
+   리포를 여럿 담은 작업 폴더 루트다. `special-characters`는 경로에 `[ ] * ? { } ( )`가 있어 권한 규칙이
+   매칭되지 않을 수 있다는 뜻이다(4절에서 규칙을 제안하지 않게 된다). `partial`은 시간 상한·파일 수 상한(5000)·
+   읽기 실패로 집계가 끊겨 `stale`·`nearly-empty`를 판단하지 않았다는 뜻이다. `scan.timed_out`이 `true`면 탐색이 시간 상한에서 멈춰 목록이
    불완전하다고 알린다. 목록 끝에 **"새로 만들기(기본값) `<create_new.path>`"**와 **"직접 입력"**을 둔다.
 3. **어느 것도 미리 골라 두지 마라.** 이 문항만은 Enter 수락 기본값을 붙이지 않는다. 신호가 가장 많거나
    경고가 없는 후보라도 "추천"·"(Enter = 수락)"으로 표시하지 않는다. 후보가 0개면 새로 만들기와 직접
@@ -154,7 +156,7 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
    폴더가 있으면 경고한다. Claude Code가 그 아래 쓰기를 보호 경로로 보고 허용 규칙과 무관하게 매번
    묻는다. 사용자가 그래도 쓰겠다고 하면 그대로 쓴다. 노트 보관소 루트를 입력했으면 `<입력>/smartthink/`를
    쓸지 한 번 묻는다.
-6. 고른 경로가 git 리포 안이면(후보의 `git_repo`, 직접 입력이면 상위에 `.git`이 있는지) `packs/`를 그
+6. 고른 경로가 git 리포 안이면(후보의 `git_repo`, 직접 입력이면 홈 아래 상위 폴더에 `.git`이 있는지. 홈 자체의 `.git` 닷파일 리포는 치지 않는다) `packs/`를 그
    리포의 `.gitignore`에 넣을지 **묻는다**. 팩은 모듈 원문 사본이라 다시 만들 수 있는 캐시다.
    `profile.md`·`evolution-state.md`는 git에 두면 여러 머신이 공유한다. 승인했을 때만 `.gitignore`에
    `<리포 기준 경로>/packs/` 한 줄을 추가한다(파일이 있으면 기존 내용 보존, 이미 있으면 추가하지 않음).

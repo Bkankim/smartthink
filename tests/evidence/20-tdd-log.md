@@ -226,3 +226,95 @@ python3 scripts/check-structure.py -> exit=0, 38 passed, 0 failed, 5 skipped (D.
 uv run --with pytest pytest -q tests -> 76 passed, 25 subtests passed
 git diff (병합 d104727 기준) 추가 em dash 0, 토큰 흔적 grep 0
 ```
+
+---
+
+# final-review 20260927-041256 후속 (Spec PASS, 버그 판정 반영)
+
+패치 01~05는 리뷰 단계에서 먼저 만들어졌다. TDD 증거를 위해 다섯 패치를 역순으로 되돌리고, 테스트를 먼저 써서 red를 본 뒤 패치를 다시 적용했다.
+
+## 사이클 17 (#1): 읽을 수 없는 폴더가 있어도 `--candidates`가 죽지 않는다 (Python 3.9 시스템 python3 포함)
+
+```
+E   PermissionError: [Errno 13] Permission denied: '<TMP>/home/locked/.obsidian'
+SUBFAILED(python='/usr/bin/python3') tests/test_resolve_vault.py::CandidatesTest::test_unreadable_folder_does_not_break_the_scan
+```
+
+## 사이클 18 (#2): worktree·submodule(.git 파일)도 리포로 세어 `workspace-root`를 붙인다
+
+```
+E       AssertionError: Lists differ: [] != ['workspace-root']
+FAILED tests/test_resolve_vault.py::CandidatesTest::test_worktrees_count_as_repositories
+```
+
+## 사이클 19 (#3): 보호 폴더로 가는 심링크를 등록 목록이 가리키면 후보에서 뺀다
+
+```
+E       AssertionError: '<TMP>/home/notes-link' unexpectedly found in {'<TMP>/home/notes-link': {... 'signals': ['registry:obsidian', 'marker:.obsidian', 'name:notes'] ...}}
+FAILED tests/test_resolve_vault.py::CandidatesTest::test_registry_symlink_into_protected_folder_is_refused
+```
+
+## 사이클 20 (#4): 경로에 규칙 문법 문자가 있는 후보에 `special-characters` 경고를 붙인다
+
+```
+E       AssertionError: Lists differ: [] != ['special-characters']
+FAILED tests/test_resolve_vault.py::CandidatesTest::test_rule_syntax_in_a_candidate_path_is_warned
+```
+
+## 사이클 21 (#6): uninstall.sh의 포인터 안내가 resolver처럼 `XDG_CONFIG_HOME` 공백을 무시한다
+
+```
+E       AssertionError: '<TMP>/home/cfg/smartthink/vault-pointer' not found in 'SmartThink Uninstaller ... preserved in <TMP>/home/notes ...'
+FAILED tests/test_install_legacy.py::UninstallTest::test_pointer_hint_follows_xdg_config_home_like_the_resolver
+```
+
+## 사이클 22 (#5): install.sh가 기본 vault 폴더를 만들지 않고, 쓰기 가능 여부만 링크 전에 검사한다
+
+`--ensure` 대신 resolver를 인자 없이 불러 경로를 얻고, 그 경로(없으면 가장 가까운 존재 조상)가 쓰기 가능한 디렉터리인지 본다. 읽기 전용 조상 케이스(`test_read_only_vault_parent_stops_before_any_link`)는 보호 유지 회귀로 함께 넣었고 처음부터 통과했다.
+
+```
+E       AssertionError: True is not false
+FAILED tests/test_install_legacy.py::InstallTest::test_install_does_not_create_the_default_vault
+1 failed, 1 passed, 17 deselected
+```
+
+## 사이클 23 (#7): 후보 하나의 stat 실패는 그 후보만 `partial`로 표시하고 스캔은 계속된다
+
+검색 권한 없는 폴더(0444)는 이름은 나열되지만 항목 lstat이 실패한다. 스캔 도중 파일이 사라지는 경우를 결정적으로 재현하려고 이 조건을 썼다. stat 실패는 시간 초과가 아니므로 `scan.timed_out`은 올리지 않는다.
+
+```
+E   AssertionError: 1 != 0 : Traceback (most recent call last):
+E   PermissionError: [Errno 13] Permission denied: '<TMP>/home/Broken Vault/attic/old.md'
+FAILED tests/test_resolve_vault.py::CandidatesTest::test_stat_failure_marks_only_that_candidate_partial
+```
+
+## 사이클 24 (#9): FILE_COUNT_CAP에 걸린 후보는 `partial`로 표시하고 `stale`·`nearly-empty`를 붙이지 않는다
+
+```
+E       AssertionError: Lists differ: ['stale'] != ['partial']
+FAILED tests/test_resolve_vault.py::CandidatesTest::test_file_count_cap_marks_the_candidate_partial
+```
+
+## 사이클 25 (#9 보완): 파일 수 상한에 걸린 작업 폴더도 `workspace-root` 경고는 유지한다
+
+사이클 24만 적용하면 리포 30개짜리 실제 작업 폴더(보통 5000개를 넘는다)가 `partial`만 받고 `workspace-root`를 잃는다. 리포 수는 표본과 무관하므로 상한 때도 센다.
+
+```
+E       AssertionError: Lists differ: ['partial'] != ['partial', 'workspace-root']
+FAILED tests/test_resolve_vault.py::CandidatesTest::test_capped_workspace_root_keeps_its_warning
+```
+
+## 사이클 26 (#10): `in_git_repo`의 조상 탐색을 HOME에서 멈춘다(`$HOME/.git` 닷파일 리포는 후보의 git 여부로 치지 않음)
+
+```
+E       AssertionError: True is not false
+FAILED tests/test_resolve_vault.py::CandidatesTest::test_dotfiles_repo_at_home_is_not_a_vault_repo
+```
+
+## 2차 후속 완료 기준 출력
+
+```
+python3 scripts/check-structure.py -> exit=0, 38 passed, 0 failed, 5 skipped (D. wiring 11개 전부 PASS)
+uv run --with pytest pytest -q tests -> 87 passed, 27 subtests passed
+추가 em dash 0, 토큰 흔적 grep 0
+```
