@@ -1,0 +1,77 @@
+# T12 재실측 t2-direct-iso (2026-09-26, 수정 후 SKILL.md, Claude Code 2.1.283, --model opus, 비대화식 지시 문구 없음)
+- 호출 경로: /smartthink:smartthink  |  입력: T2 원문(--budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘)
+- 설정: 격리 CLAUDE_CONFIG_DIR. 중첩 실행이라 CLAUDE_CODE_OAUTH_TOKEN을 자식 env에만 주입([REDACTED]). CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, SMARTTHINK_VAULT=새 임시 디렉터리, cwd=임시 디렉터리
+- 격리 settings.json 원문:
+```json
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Glob", "Grep", "Edit(/$TMPDIR/st-B-t2-direct-iso-vault.smgq/**)", "WebSearch", "WebFetch", "Agent", "Skill"],
+    "deny": ["Read(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]
+  }
+}
+```
+- 로딩된 SKILL.md (트랜스크립트): Base directory for this skill: ~/workspace/smartthink-fix-9-headless-gate/skills/smartthink
+- Skill 호출 순서: (슬래시 명령이 스킬을 직접 로딩)
+- 메인 도구·텍스트 순서: Bash Bash Read Bash Agent TEXT Bash TEXT
+- 트랜스크립트 게이트 머리줄: 없음(6항목 게이트 블록 미출력, 판정은 요약 줄로)
+- manifest: budget 60000 | research True | modules ['핵심 엔진', '실행 속도'] | est_tokens {'pack': 53945, 'agent': 61000}
+
+## python3 scripts/check-structure.py --pack <팩 사본 디렉터리>
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+pack: 5 passed, 0 failed, 0 skipped
+exit=0
+
+## 표준 출력·표준 오류 원문
+# run=B-t2-direct-iso mode=iso start=2026-09-26 23:33:08 vault=$TMPDIR/st-B-t2-direct-iso-vault.smgq cwd=$TMPDIR/st-B-t2-direct-iso-cwd.0IGZ cfg=$TMPDIR/st-B-t2-direct-iso-cfg.H63V
+# prompt: /smartthink:smartthink --budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘
+## 1. 무장 브리핑
+
+**활성 프레임 3**
+1. **역전 사고(#11)** - 개선안보다 먼저 "이 화면이 이용자를 반드시 실망시키려면 무엇이 필요한가"를 10개 이상 나열한다. 문제 진단 단계의 주 엔진이다.
+2. **제1원리 분해(#1)** - 순번·예상 대기·상태·수령 안내를 "이용자가 다음 행동을 정하는 데 필요한 최소 사실"로 분해해서, 기존 OPAC/ILS 화면 관습(순번 숫자 하나만 보여주기 등)과 기저 진실을 구분한다. 개선안 설계 단계의 주 엔진이다.
+3. **실행 속도(Type 1/2 문 + MVT + 킬 기준)** - 문구·레이아웃처럼 되돌릴 수 있는 변경과 순번 산정 로직·미대출 정책·ILS 설정처럼 되돌리기 어려운 변경을 나눠서, 검증과 롤아웃 속도를 다르게 가져간다. 반직관 검증(#6)은 이 단계의 반증 실험에서 쓴다.
+
+**이 작업에 적용할 규칙**
+- 개선안을 쓰기 전에 실패 모드 카탈로그(10개 이상, 확률×영향 등급 포함)부터 완성한다.
+- 순번 표시를 바꾸기 전에 쓰고 있는 ILS가 순번을 어떻게 계산하는지(선착순 여부, 일시정지 건너뛰기, 이용 가능 예약 제외 여부) 먼저 확인한다. SirsiDynix Symphony는 선착순이 아닐 수 있다.
+- 예상 대기 표시에서는 "안내보다 늦게 받는 경험"을 1순위 실패 모드로 둔다. 안내한 시간보다 오래 기다리면 이탈이 급증한다는 실증 결과(Webb 외)가 있다.
+- 모든 변경 항목을 Type 1과 Type 2로 분류하고, Type 2는 파일럿과 롤백으로 빨리 돌리고 Type 1만 사전 검토를 거친다.
+- 파일럿마다 시작 전에 킬 기준(기한·지표·임계값)을 문서로 고정한다.
+- "정보를 더 많이 보여주면 이용자 만족이 오른다"는 합의를 그대로 믿지 말고 반증 실험 대상으로 올린다.
+- 불만 하나하나를 표시 / 정책 / 공급(장서·라이선스) 중 하나로 분류하고, 표시가 아닌 원인은 계획 범위 밖이라고 명시한다.
+
+**관련 과거 인사이트**
+- 없음 (진화 상태 빈 시드, 세션 0).
+
+**경계할 편향**
+1. **측정 가능한 것만 실재로 보는 편향(핵심 엔진 유래)** - 예상 대기일 오차나 클릭률처럼 숫자로 나오는 것만 개선 대상에 오르고, "순번이 뒤로 밀린 것 같다" 같은 신뢰 훼손 신호가 진단에서 빠질 위험이 있다.
+   회피: 실패 모드 카탈로그에 이용자 체감형 실패 모드(숫자로 바로 측정되지 않는 것)를 먼저 3개 이상 적은 뒤 정량 항목을 추가한다.
+2. **스타트업 속도 벤치마크 전이(실행 속도 모듈 유래)** - Amazon 11.7초 배포나 주 3회 실험 같은 기준을 벤더 종속·조달 주기에 묶인 공공 도서관 OPAC에 그대로 대입하면 롤아웃 일정이 비현실적으로 짜인다.
+   회피: 롤아웃 단계를 쓰기 전에 변경 항목별로 "도서관 설정만으로 가능 / 커스텀 필요 / 벤더 요청 필요" 표를 먼저 만든다.
+3. **화면 문제로 조기 수렴(작업 해석 유래)** - 대기 자체가 긴 원인(예: Multnomah 인기 10종 예약 비율을 맞추려면 4.5만 달러 이상)이나 수령 기한 정책을 화면 개선으로 해결하려는 계획이 될 수 있다.
+   회피: 진단 산출물에 표시 / 정책 / 공급 3칸 분류표를 넣고, 표시 칸이 아닌 항목 옆에 "범위 밖, 담당 부서"를 적는다.
+
+**다음 단계**
+- 무장이 끝났다. 이제 본 작업(진단 → 개선안 → 검증 → 단계별 롤아웃 계획 설계)에 착수하면 된다. 4절 적용 레이어의 순서(역전 → 제1원리 → 반직관 → 실행 속도)를 뼈대로 쓰고, 3절 수치는 출처와 함께 인용한다.
+- 본 작업은 `/effort xhigh`로 진행하기를 권장한다.
+- 리서치 수행됨: 출처 29건(원문 확인 2건, 나머지는 검색 요약 경유, 원문 빈 응답 1건). 미대출 예약 비율의 공개 통계는 찾지 못했다(3절 반대 신호 참조).
+
+팩: $TMPDIR/st-B-t2-direct-iso-vault.smgq/packs/2026-09-26-library-hold-queue-display/  |  모듈: 핵심 엔진, 실행 속도  |  비용: 팩 ≈54K / 작업 ≈61K  |  리서치: ON
+
+※ 게이트 추정치와 실제 값이 다릅니다. 팩은 ≈48K로 추정했지만 ≈54K였고, 60K 상한 안입니다. armorer 작업량은 ≈61K로 60K를 조금 넘었습니다. 상한은 메인에 실리는 팩에만 적용되므로 절삭 조건에는 해당하지 않습니다.
+
+프로필이 아직 없습니다. `/st init`으로 프로필을 만들면 다음 무장부터 사용자에 맞게 모듈을 추천합니다.
+
+무장 완료. 이제 작업을 지시하세요.
+깊은 작업이라면 /effort xhigh 를 먼저 실행하는 것을 권장합니다.
+
+헤드리스: 자동 진행 | 상한 60K | 절삭: 메타인지·TRIZ·인지 무기고 제외(-90K) | 복원: 없음 | 팩: $TMPDIR/st-B-t2-direct-iso-vault.smgq/packs/2026-09-26-library-hold-queue-display/
+# exit=0 end=2026-09-26 23:38:41
+# packs:
+$TMPDIR/st-B-t2-direct-iso-vault.smgq/evolution-state.md
+$TMPDIR/st-B-t2-direct-iso-vault.smgq/packs/2026-09-26-library-hold-queue-display/pack.md
+$TMPDIR/st-B-t2-direct-iso-vault.smgq/packs/2026-09-26-library-hold-queue-display/manifest.json

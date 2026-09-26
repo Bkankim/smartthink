@@ -1,0 +1,13 @@
+{
+  "task": "공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘",
+  "interpretation": "공공 도서관 예약 대기열 안내 화면(대기 순번, 예상 대기 시간, 상태 알림)을 개선하는 실행 계획을 문제 정의 → 설계 → 파일럿 → 측정 → 확산 5단계로 설계한다. 표시 방식(UI)과 예상 대기 산출 정확도·미대출 운영 규칙을 분리해 다룬다.",
+  "cynefin": "Complicated",
+  "classification": "문제 해결",
+  "modules": ["인지 무기고"],
+  "budget": 60000,
+  "research": true,
+  "profile_version": null,
+  "est_tokens": { "pack": 53156, "agent": 72000 },
+  "created": "2026-09-26T23:35:57+09:00",
+  "harness": "claude-code-headless"
+}

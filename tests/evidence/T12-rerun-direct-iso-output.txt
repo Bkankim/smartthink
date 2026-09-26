@@ -1,0 +1,78 @@
+# T12 재실측 direct-iso (2026-09-26, 수정 후 SKILL.md, Claude Code 2.1.283, --model opus, 비대화식 지시 문구 없음)
+- 호출 경로: /smartthink:smartthink  |  입력: T12 원문(--budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘)
+- 설정: 격리 CLAUDE_CONFIG_DIR. 중첩 실행이라 CLAUDE_CODE_OAUTH_TOKEN을 자식 env에만 주입([REDACTED]). CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, SMARTTHINK_VAULT=새 임시 디렉터리, cwd=임시 디렉터리
+- 격리 settings.json 원문:
+```json
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Glob", "Grep", "Edit(/$TMPDIR/st-B-direct-iso-vault.rxJi/**)", "WebSearch", "WebFetch", "Agent", "Skill"],
+    "deny": ["Read(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]
+  }
+}
+```
+- 로딩된 SKILL.md (트랜스크립트): Base directory for this skill: ~/workspace/smartthink-fix-9-headless-gate/skills/smartthink
+- Skill 호출 순서: (슬래시 명령이 스킬을 직접 로딩)
+- 메인 도구·텍스트 순서: Bash Read Bash Read Agent TEXT Bash Read TEXT
+- 트랜스크립트 게이트 머리줄: 없음(6항목 게이트 블록 미출력, 판정은 요약 줄로)
+- manifest: budget 120000 | research True | modules ['core-engines.md (제1원리 분해, 역전 사고, 복합 우위 적층)', 'cognitive-arsenal.md', 'anti-fragile-strategy.md', 'pattern-synthesis.md'] | est_tokens {'pack': 127169, 'agent': 130000}
+
+## python3 scripts/check-structure.py --pack <팩 사본 디렉터리>
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+pack: 5 passed, 0 failed, 0 skipped
+exit=0
+
+## 표준 출력·표준 오류 원문
+# run=B-direct-iso mode=iso start=2026-09-26 23:33:08 vault=$TMPDIR/st-B-direct-iso-vault.rxJi cwd=$TMPDIR/st-B-direct-iso-cwd.UPjS cfg=$TMPDIR/st-B-direct-iso-cfg.KMSU
+# prompt: /smartthink:smartthink --budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘
+## 1. 무장 브리핑
+
+**활성 프레임 3**
+1. **제1원리 분해 (핵심 엔진 #1)** - "예약"을 도서·좌석·스터디룸·프로그램이라는 서로 다른 메뉴가 아니라 "희소 자원(복본·좌석·방·정원)을 시간 슬롯에 배분하는 하나의 문제"로 해체한다. 어떤 제약이 물리적 한계이고 어떤 제약이 관습인지 가르는 데 쓴다.
+2. **역전 사고 / 프리모템 (핵심 엔진 #11, 인지 무기고 #53)** - 3~5년 뒤 "개선 사업이 실패했다"는 상태에서 거꾸로 원인을 뽑는다. 벤더 선정, 통합 회원·데이터 표준, 통합 범위처럼 되돌릴 수 없는 결정에만 쓴다.
+3. **바벨 전략과 복합 우위 적층의 긴장 (안티프래질 2장 ↔ 핵심 엔진 #9)** - 우선순위를 정할 때 "집중해서 오래 쌓을 기반"과 "싸게 여러 번 실험할 기능"을 나누는 기준으로 쓴다.
+
+**이 작업에 적용할 규칙**
+- 예약 대상은 자료(예약·상호대차·무인대출·전자책), 열람실 좌석, 스터디룸·공간, 프로그램의 4개 자원으로 나눠 따로 진단하라. 하나로 뭉뚱그려 결론 내지 마라.
+- 엔진이 내놓은 결과는 모두 공공 목적함수(접근성·형평성·비용 효율·예산이나 정권이 바뀌어도 이어지는 지속성)로 옮겨 적어라. "해자", "승자독식", "런웨이" 같은 용어가 결론 문장에 남아 있으면 번역하거나 지워라.
+- 결정 항목마다 먼저 비가역인지 가역인지 표시하라. 비가역(회원 식별 체계, 데이터 표준, 조달·벤더, 교육청·지자체 통합 범위)은 복합 우위 관점과 프리모템으로 다룬다. 가역(UX, 노쇼 규칙, 좌석 정책, 수령 방식)은 바벨의 10% 실험으로 돌린다.
+- 노쇼, 좌석 사유화, 다중 예약 같은 행동은 이용자의 선의에 기대지 말고 메커니즘 디자인(인증 시한, 누적 제재, 보류 한도, 재배분 규칙)으로 다뤄라.
+- 수요의 무게중심이 이동하는지를 먼저 검증하라. 방문은 2억3,053만 명(+2.8%)으로 늘고 대출은 1억4,630만 권으로 보합 또는 감소하며 프로그램 참가는 3,095만 명(+6.98%)으로 늘었다. 이 비대칭을 결론이 아니라 가설로 다뤄라.
+- 미국 전자책 대기열·라이선스 수치는 "가정"이라고 표기하고, 한국 쪽에 대응하는 수치가 없다는 사실을 함께 적어라.
+- 옵션마다 디지털 약자가 쓸 수 있는 경로(창구, 전화, 대리 예약)가 있는지 필수로 점검하라.
+- 3~5년 로드맵은 한 번에 크게 바꾸는 방식이 아니라 인접 가능 연쇄(A → B → C, 단계당 6~18개월)로 그려라.
+
+**관련 과거 인사이트**
+- 없음 (진화 상태 비어 있음, sessions 0)
+
+**경계할 편향**
+1. **기술 교체로의 조기 수렴** - "예약 시스템 개선"이라는 표현 때문에 통합 플랫폼 구축이나 시스템 교체로 곧장 좁혀지기 쉽다. 그런데 리서치에서는 규정이 있어도 집행 인력이 없어 노쇼가 방치되는 사례가 나왔다. 원인이 정책·인력·자원에 있을 수 있다.
+   회피: 해법을 논의하기 전에 예약 불편의 원인을 '시스템 / 정책·규칙 / 자원(복본·좌석·예산) / 인력·운영' 4칸으로 나누고, 칸마다 사례를 1개 이상 채워라.
+2. **스타트업 프레임 이식 편향 (핵심 엔진·안티프래질 유래)** - 복합 우위, 모트, 런웨이 18개월, 바벨 90/10은 경쟁과 파산이 있는 기업을 전제로 한다. 공공도서관에는 경쟁사도 파산도 없다. 대신 형평성과 법정 의무가 목적이라서 그대로 옮기면 우선순위가 뒤틀린다.
+   회피: 4절의 엔진 산출물을 쓸 때마다 "공공 번역:" 한 줄을 붙여라. 번역할 수 없는 산출물은 버려라.
+3. **해외 데이터 과잉 일반화 / 계량 가능한 것만 실재로 취급** - 3절의 정량 수치 상당수는 미국 전자책 사례다(WCPL 주간 예산 75%, ReadersFirst 40%). 한국은 책바다 전국 연간 신청 건수, 좌석 노쇼율, 전자책 대기 수치를 찾지 못했다. 그래서 수치가 있는 쪽이 과대 대표될 위험이 있다.
+   회피: 본 작업에서 수치를 인용할 때는 [국내 실측 / 해외 유추 / 추정]을 반드시 태그로 달고, 국내 실측이 없는 판단은 따로 모아 "데이터 확보 과제" 목록으로 남겨라.
+
+**다음 단계**
+- 무장이 끝났다. 이제 본 작업(예약 시스템 3~5년 장기 개선 전략 검토)을 시작하면 된다. 2절의 미확정 지점부터 확인하라. 특히 추진 주체가 단일관인지, 지자체 도서관 네트워크인지, 교육청 소속관 포함인지가 중요하다.
+- 깊은 추론이 필요한 작업이다. `/effort xhigh`로 올린 뒤 진행하라.
+- 리서치는 수행했다(출처 16개, 차단 1건). 책바다 전국 건수와 국내 좌석·전자책 대기 데이터는 없으니 3절의 공백을 먼저 확인하라.
+
+팩: $TMPDIR/st-B-direct-iso-vault.rxJi/packs/2026-09-26-library-reservation-longterm-strategy/  |  모듈: 핵심 엔진, 인지 무기고, 안티프래질 전략, 패턴 합성  |  비용: 팩 ≈127K / 작업 ≈130K  |  리서치: ON
+
+⚠ 추정치 차이: 완성된 팩은 약 127K로 게이트 추정치 116.6K보다 크고, 120K 상한도 약 7K 넘습니다. 초과분은 3절(리서치)과 4절(적용 레이어)이 추정보다 길어져서 생겼습니다. 절삭은 1패스라 다시 줄이지 않았습니다.
+
+아직 프로필이 없습니다. `/st init`으로 프로필을 만들면 다음 무장부터 사용자에게 맞춰 모듈을 고릅니다.
+
+무장 완료. 이제 작업을 지시하세요.
+깊은 작업이라면 /effort xhigh 를 먼저 실행하는 것을 권장합니다.
+
+헤드리스: 자동 진행 | 상한 120K | 절삭: 메타인지 제외(-24.7K) | 복원: 없음 | 팩: $TMPDIR/st-B-direct-iso-vault.rxJi/packs/2026-09-26-library-reservation-longterm-strategy/
+# exit=0 end=2026-09-26 23:40:18
+# packs:
+$TMPDIR/st-B-direct-iso-vault.rxJi/evolution-state.md
+$TMPDIR/st-B-direct-iso-vault.rxJi/packs/2026-09-26-library-reservation-longterm-strategy/pack.md
+$TMPDIR/st-B-direct-iso-vault.rxJi/packs/2026-09-26-library-reservation-longterm-strategy/manifest.json

@@ -1,0 +1,13 @@
+{
+  "task": "--budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘",
+  "interpretation": "지역 공공도서관 예약 시스템(도서 예약·상호대차, 열람실/좌석, 시설·스터디룸, 프로그램)의 장기 개선 전략 검토. 이용자 경험, 운영 효율, 공공성(공정 배분·디지털 소외), 기술 부채·벤더 종속, 지자체 예산 제약을 포괄. '검토' 대상(기존안 평가 vs 신규 수립)과 주체 범위는 미확정.",
+  "cynefin": "Complex",
+  "classification": "전략 수립",
+  "modules": ["core-engines.md", "cognitive-arsenal.md", "anti-fragile-strategy.md"],
+  "budget": "120000",
+  "research": true,
+  "profile_version": null,
+  "est_tokens": { "pack": 109494, "agent": 126000 },
+  "created": "2026-09-26T23:35:42+09:00",
+  "harness": "claude-agent-sdk"
+}

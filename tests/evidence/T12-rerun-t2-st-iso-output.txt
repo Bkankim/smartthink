@@ -1,0 +1,76 @@
+# T12 재실측 t2-st-iso (2026-09-26, 수정 후 SKILL.md, Claude Code 2.1.283, --model opus, 비대화식 지시 문구 없음)
+- 호출 경로: /st  |  입력: T2 원문(--budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘)
+- 설정: 격리 CLAUDE_CONFIG_DIR. 중첩 실행이라 CLAUDE_CODE_OAUTH_TOKEN을 자식 env에만 주입([REDACTED]). CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, SMARTTHINK_VAULT=새 임시 디렉터리, cwd=임시 디렉터리
+- 격리 settings.json 원문:
+```json
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Glob", "Grep", "Edit(/$TMPDIR/st-B-t2-st-iso-vault.qtFx/**)", "WebSearch", "WebFetch", "Agent", "Skill"],
+    "deny": ["Read(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]
+  }
+}
+```
+- 로딩된 SKILL.md (트랜스크립트): Base directory for this skill: ~/workspace/smartthink-fix-9-headless-gate/skills/smartthink
+- Skill 호출 순서: smartthink:st -> smartthink:smartthink
+- 메인 도구·텍스트 순서: Skill Skill Bash TEXT Bash Bash Agent TEXT Bash TEXT
+- 트랜스크립트 게이트 머리줄: 없음(6항목 게이트 블록 미출력, 판정은 요약 줄로)
+- manifest: budget 60000 | research True | modules ['인지 무기고'] | est_tokens {'pack': 53156, 'agent': 72000}
+
+## python3 scripts/check-structure.py --pack <팩 사본 디렉터리>
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+pack: 5 passed, 0 failed, 0 skipped
+exit=0
+
+## 표준 출력·표준 오류 원문
+# run=B-t2-st-iso mode=iso start=2026-09-26 23:33:08 vault=$TMPDIR/st-B-t2-st-iso-vault.qtFx cwd=$TMPDIR/st-B-t2-st-iso-cwd.JAel cfg=$TMPDIR/st-B-t2-st-iso-cfg.nHRX
+# prompt: /st --budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘
+## 1. 무장 브리핑
+
+**활성 프레임 3**
+1. **앵커링(#29) + 프레이밍(#35)** - 이용자가 처음 보는 "예상 대기"가 이후 체감 전체의 기준점이 됩니다. 무엇을 첫 숫자로 보여줄지, 점으로 보여줄지 범위로 보여줄지를 설계하는 렌즈입니다.
+2. **피크엔드 법칙(#37) + 자이가르닉 효과(#38)** - 예약부터 수령까지의 대기 여정에서 기억에 남는 순간(순번 급변, 도착 알림, 수령 마감)을 골라 집중 설계하는 렌즈입니다.
+3. **진화(#11) + 베이즈 정리(#42) ↔ 유전적 부동(#19)** - 파일럿·측정·확산 단계를 변이, 선택, 보존의 구조로 짜고, 작은 파일럿 표본의 결과를 얼마나 믿을지 정하는 렌즈입니다.
+
+**이 작업에 적용할 규칙**
+- 예상 대기를 한 번 보여줬다면, 실제 대기가 그보다 길어지는 경우를 먼저 줄이세요. 약속한 대기를 넘기면 만족이 떨어지고, 실제 대기가 예상과 맞을 때 추정치 표시가 효과를 냅니다(3절).
+- 화면 요소 하나에 모델 하나를 붙일 때마다 "바뀌는 지표 1개"를 함께 적으세요. 지표를 못 적으면 그 요소는 계획에서 뺍니다.
+- 순번이 뒤로 밀릴 수 있는 사례(정지된 예약 해제, 소장 권수 감소)를 먼저 목록으로 만드세요. 공정성 지각은 이 순간에 깨집니다.
+- 미대출(찾아가지 않은 예약)은 손실 회피 프레임으로 다루되, 가짜 긴급성은 금지합니다.
+- 파일럿 결과는 사전 확률을 명시한 뒤 업데이트하세요. 한 지점, 몇 주 분량의 데이터로 전면 확산을 결정하지 않습니다.
+- 모델 사이에 충돌이 생기면 부록 B의 해소 기준을 먼저 적용하세요(4절 참고).
+
+**관련 과거 인사이트**
+- 없음 (진화 상태가 빈 시드입니다)
+
+**경계할 편향**
+1. **모델 나열로 설계 대체(인지 무기고 유래)** - 대기 심리 모델(앵커링·손실 회피·피크엔드·자이가르닉)을 예약 대기 화면 요소에 1:1로 붙이기만 하면, 설계가 끝난 것처럼 보이는 착시가 생깁니다.
+   회피: 적용한 모델마다 "어느 화면 요소가 바뀌고, 어떤 지표가 움직이는지"를 1줄로 적고, 적지 못한 모델은 실행 계획에서 삭제하세요.
+2. **'화면 개편' 해석으로의 조기 수렴** - 체감 대기의 원인이 표시 방식(UI)이 아니라 예상 대기 산출 로직의 정확도나 미대출 운영 규칙에 있을 수 있습니다. 예를 들어 Toronto의 연간 예약 미수령 비율은 약 14%였습니다. UI만 고치면 진짜 원인을 놓칩니다.
+   회피: 문제 정의 단계에 "표시 정확도 문제인가, 표시 방식 문제인가"를 가르는 진단 질문을 1개 이상 먼저 적으세요.
+3. **해외 효과 크기의 무근거 이식(지식 결핍 유래)** - 리서치 근거가 차량 호출, 응급실, Libby 전자책 등 해외 사례 위주입니다. 한국 공공도서관의 예약 취소·미대출 비율은 공개된 수치를 찾지 못했습니다.
+   회피: 파일럿을 설계하기 전에, 대상 도서관 ILS의 예약 로그(예약 건수, 미대출 자동취소 건수, 사용자 취소 건수) 확보를 1단계 과제로 명시하세요.
+
+**다음 단계**
+- 무장이 끝났습니다. 이제 본 작업인 "예약 대기열 안내 화면 개선 실행 계획 설계"에 착수하시면 됩니다. 4절의 적용 레이어가 문제 정의, 설계, 파일럿, 측정, 확산의 각 단계에 어떤 모델을 어떤 순서로 넣을지 안내합니다.
+- 리서치는 수행했습니다(출처 13개, 차단 1건). 다만 한국 도서관의 정량 데이터는 공백입니다.
+- 설계 판단의 밀도가 높은 작업이므로 `/effort xhigh`를 권장합니다.
+
+팩: `$TMPDIR/st-B-t2-st-iso-vault.qtFx/packs/2026-09-26-library-reservation-queue-screen/`  |  모듈: 인지 무기고  |  비용: 팩 ≈53K / 작업 ≈72K  |  리서치: ON
+
+※ 게이트 추정과 실제 비용이 다릅니다. 팩은 48.5K로 추정했으나 실제 53K였고(상한 60K 이내), 작업은 63.1K로 추정했으나 실제 72K였습니다.
+
+프로필이 없습니다. `/st init`으로 프로필을 만들면 다음 무장부터 사용자에게 맞춰 모듈을 고릅니다.
+
+무장 완료. 이제 작업을 지시하세요.
+깊은 작업이라면 /effort xhigh 를 먼저 실행하는 것을 권장합니다.
+
+헤드리스: 자동 진행 | 상한 60K | 절삭: 메타인지·TRIZ·실행 속도·핵심 엔진 제외 | 복원: 없음 | 팩: $TMPDIR/st-B-t2-st-iso-vault.qtFx/packs/2026-09-26-library-reservation-queue-screen/
+# exit=0 end=2026-09-26 23:38:19
+# packs:
+$TMPDIR/st-B-t2-st-iso-vault.qtFx/evolution-state.md
+$TMPDIR/st-B-t2-st-iso-vault.qtFx/packs/2026-09-26-library-reservation-queue-screen/pack.md
+$TMPDIR/st-B-t2-st-iso-vault.qtFx/packs/2026-09-26-library-reservation-queue-screen/manifest.json

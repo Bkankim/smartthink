@@ -1,0 +1,24 @@
+# I9 판별 신호 탐침 (2026-09-26, Claude Code 2.1.283, --model haiku/opus, 부모 세션 CLAUDE_CODE_ENTRYPOINT=cli)
+
+## P1. Bash로 진입점 환경변수 읽기 (실제 설정, defaultMode auto, claude -p)
+명령: claude --model haiku -p 'Run exactly this Bash command and print its raw output only: echo "EP=${CLAUDE_CODE_ENTRYPOINT:-unset} ..."'
+출력: The Bash tool requires approval to expand environment variables or run the requested command. ... Would you like to approve this tool call?
+명령: claude --model haiku -p 'Run exactly this Bash command: printenv CLAUDE_CODE_ENTRYPOINT ...'
+출력: The command requires user approval. Please approve the tool use to proceed.
+=> 헤드리스 자식은 승인 프롬프트에 답할 수 없어 환경변수 읽기가 거부된다. Bash 기반 판별은 auto 모드에서 결정적이지 않다.
+
+## P2. 도구 호출 없이 보이는 신호 (실제 설정, claude --model opus -p)
+(1) "You have access to a set of functions you can use to answer the user's question."
+(2) no
+(3) "You are a Claude agent, built on Anthropic's Claude Agent SDK." | "Each agent type's model, reasoning effort, and tools come from its definition (`.claude/agents/*.md` frontmatter or SDK `agents`)." | "Current branch: fix-9-headless-gate" (not a full sentence, but it contains "headless")
+(4) Agent, Bash, Edit, ListAgents, Read, ReportFindings, ScheduleWakeup, Skill, ToolSearch, Workflow, Write
+
+## P3. 같은 탐침 (격리 CLAUDE_CONFIG_DIR, claude --model opus -p)
+(1) You are a Claude agent, built on Anthropic's Claude Agent SDK.
+(2) no
+(3) Agent, Bash, Edit, ListAgents, Read, ReportFindings, ScheduleWakeup, Skill, ToolSearch, Workflow, Write
+
+## 대조: 대화형 Claude Code 세션(이 워커 세션 자신)
+- 시스템 프롬프트 첫 정체성 문장: "You are Claude Code, Anthropic's official CLI for Claude."
+- AskUserQuestion 도구: 있음
+=> 헤드리스(-p) 신호 = 정체성 문장이 "Claude Agent SDK" + AskUserQuestion 부재. 두 설정 모두 동일.
