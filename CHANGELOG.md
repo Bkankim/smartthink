@@ -2,7 +2,7 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/).
 
-## 3.0.0 (unreleased)
+## 3.0.0 (2026-09-26)
 
 SmartThink stops being an analysis command and becomes a **context arming engine**. It no longer
 answers your question: it builds the session that will. Before you start the real work, it routes
