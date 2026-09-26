@@ -9,13 +9,17 @@ keeps the hash intact, and one script instead of printf/cat redirections keeps t
 a single command that one narrow allow rule can cover (issue #21).
 
 Usage:
-  python3 <SCRIPTS_DIR>/assemble-pack.py --pack-dir <DIR> --modules <name.md> [<name.md> ...]
+  python3 <SCRIPTS_DIR>/assemble-pack.py --pack-dir "<DIR>" --modules <name.md> [<name.md> ...]
+
+  The script path is the allow-rule prefix and stays unquoted; arguments may be quoted (the pack
+  directory always is, so a vault path with spaces stays one argument).
 
   python3 <SCRIPTS_DIR>/assemble-pack.py --permission-rule
 
 Output: JSON {"pack", "modules", "bytes", "est_tokens_pack"} on stdout, exit 0.
---permission-rule prints {"permission_rule", "permission_rule_effective", "script"}: the one Bash
-allow rule `st init` offers so the armorer's section 5 assembly runs without a prompt.
+--permission-rule prints {"permission_rule", "command_prefix", "permission_rule_effective", "script"}:
+the one Bash allow rule `st init` offers so the armorer's section 5 assembly runs without a prompt,
+built from the path the script was invoked by (symlinks not resolved).
 Errors go to stderr with a non-zero exit, and pack.md is left untouched.
 """
 from __future__ import annotations
@@ -85,13 +89,17 @@ def check_module_names(names: list[str]) -> None:
         raise AssemblyError(
             "not one of the nine modules: " + ", ".join(unknown) + " (known: " + ", ".join(sorted(known)) + ")"
         )
+    repeated = sorted({name for name in names if names.count(name) > 1})
+    if repeated:
+        raise AssemblyError("module listed more than once: " + ", ".join(repeated))
 
 
 def check_pack_path(pack_dir: Path) -> Path:
     # The Bash allow rule lets this command run without a prompt, so the script keeps its own
-    # blast radius small: it only rewrites {VAULT}/packs/<pack>/pack.md.
+    # blast radius small: it only rewrites <dir>/packs/<pack>/pack.md. It is not given {VAULT}, so it
+    # cannot tell whether that packs/ belongs to the vault.
     if pack_dir.resolve().parent.name != "packs":
-        raise AssemblyError(f"{pack_dir} is not a pack directory ({{VAULT}}/packs/<pack>/)")
+        raise AssemblyError(f"{pack_dir} is not a pack directory (expected <dir>/packs/<pack>/)")
     pack_md = pack_dir / "pack.md"
     if pack_md.is_symlink():
         raise AssemblyError(f"{pack_md} is a symlink; refusing to read or replace it")
@@ -122,15 +130,25 @@ def assemble(pack_md: Path, names: list[str]) -> bytes:
     return head + b"\n" + blocks + (b"\n" if tail else b"") + tail
 
 
+# Characters the shell treats specially in an unquoted word (quoting, expansion, globbing, control,
+# redirection, comments). A script path containing one cannot be typed as the plain prefix.
+SHELL_SPECIAL = set("'\"`$\\;&|<>()[]{}*?!#~")
+
+
 def permission_rule() -> dict:
     # Claude Code matches Bash rules against the command text; everything before the trailing
-    # " *" must be written exactly as the armorer runs it: python3 {SCRIPTS_DIR}/assemble-pack.py,
-    # where {SCRIPTS_DIR} is the symlink-resolved absolute path. A space in that path splits the
-    # command into different words, so no prefix rule would match it.
-    script = str(Path(__file__).resolve())
+    # " *" must be written exactly as the armorer runs it: python3 {SCRIPTS_DIR}/assemble-pack.py.
+    # init runs this option through the same {SCRIPTS_DIR} string the armorer gets, so the path
+    # is taken as invoked and symlinks are deliberately not resolved: resolving a linked ancestor
+    # (/tmp -> /private/tmp, a linked checkout) would give a prefix nobody types (final-review #7).
+    # Whitespace or a shell special character in that path changes the words or fails to parse, so
+    # no prefix rule would match (final-review #8).
+    script = os.path.abspath(__file__)
+    prefix = f"python3 {script}"
     return {
-        "permission_rule": f"Bash(python3 {script} *)",
-        "permission_rule_effective": not any(char.isspace() for char in script),
+        "permission_rule": f"Bash({prefix} *)",
+        "command_prefix": prefix,
+        "permission_rule_effective": not any(char.isspace() or char in SHELL_SPECIAL for char in script),
         "script": script,
     }
 

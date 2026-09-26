@@ -1027,20 +1027,45 @@ def check_armorer_prompt_sync() -> Result:
 # instruction would bring the prompts back and bypass the script's own path checks.
 ASSEMBLER_PY = REPO_ROOT / "scripts" / "assemble-pack.py"
 ASSEMBLER_CALL_RE = re.compile(r"python3 \{SCRIPTS_DIR\}/assemble-pack\.py --pack-dir ")
-PACK_REDIRECT_RE = re.compile(r"^.*\b(?:printf|cat|echo|tee)\b[^\n]*>>.*$", re.M)
+# Any shell write that bypasses the script: printf/cat/echo with a > or >> redirect (heredoc
+# included), tee in any form, and mkdir -p for the pack directory.
+PACK_REDIRECT_RE = re.compile(r"^.*(?:\b(?:printf|cat|echo)\b[^\n]*>|\btee\b|\bmkdir\s+-p\b).*$", re.M)
+
+
+# SKILL.md carries the same rule for the inline path (final-review #9). Only that section is
+# scanned; its Write-only branch for harnesses without Bash has no redirection and stays allowed.
+INLINE_SECTION_TITLE = "## 5b단계: 인라인 경로"
+
+
+def _inline_section(text: str) -> str | None:
+    start = text.find(INLINE_SECTION_TITLE)
+    if start < 0:
+        return None
+    end = text.find("\n## ", start + len(INLINE_SECTION_TITLE))
+    return text[start : end if end >= 0 else len(text)]
 
 
 def check_armorer_assembles_with_script() -> Result:
-    """st-armorer.md and armorer-prompt.md build section 5 by calling assemble-pack.py only."""
+    """st-armorer.md, armorer-prompt.md and SKILL.md 5b build section 5 by calling assemble-pack.py only."""
     problems: list[str] = []
     evidence: list[str] = []
     if not ASSEMBLER_PY.exists():
         problems.append(f"{rel(ASSEMBLER_PY)} is missing; section 5 has no writer")
-    for path in (ARMORER_MD, ARMORER_PROMPT_MD):
-        text = read_text(path)
+    skill = read_text(SKILL_MD)
+    inline = _inline_section(skill) if skill is not None else None
+    if inline is None:
+        problems.append(f"{rel(SKILL_MD)} has no '{INLINE_SECTION_TITLE}' section to check")
+    for path, text in (
+        (ARMORER_MD, read_text(ARMORER_MD)),
+        (ARMORER_PROMPT_MD, read_text(ARMORER_PROMPT_MD)),
+        (SKILL_MD, inline),
+    ):
         if text is None:
-            problems.append(f"{rel(path)} is missing or unreadable")
+            if path != SKILL_MD:
+                problems.append(f"{rel(path)} is missing or unreadable")
             continue
+        # Line numbers are reported against the whole file, also for the SKILL.md section.
+        base = line_of(skill, skill.find(INLINE_SECTION_TITLE)) - 1 if path == SKILL_MD else 0
         call = ASSEMBLER_CALL_RE.search(text)
         if call is None:
             problems.append(
@@ -1048,15 +1073,15 @@ def check_armorer_assembles_with_script() -> Result:
                 "section 5 must be assembled by the script"
             )
         else:
-            evidence.append(f"{rel(path)}:{line_of(text, call.start())} calls assemble-pack.py")
+            evidence.append(f"{rel(path)}:{base + line_of(text, call.start())} calls assemble-pack.py")
         for match in PACK_REDIRECT_RE.finditer(text):
             problems.append(
-                f"{rel(path)}:{line_of(text, match.start())} appends with a shell redirection "
+                f"{rel(path)}:{base + line_of(text, match.start())} writes the pack with a shell command "
                 f"({match.group(0).strip()[:60]}); use assemble-pack.py instead"
             )
     if problems:
         return bad(f"{len(problems)} section 5 assembly problem(s)", problems)
-    return ok("both sides assemble section 5 with assemble-pack.py, no redirections", evidence)
+    return ok("definition, fallback and SKILL.md 5b assemble section 5 with assemble-pack.py only", evidence)
 
 
 # The three marker spellings pack section 5 is built from. analysis-method.md is the SSOT;
