@@ -49,9 +49,18 @@ def read_pointer(pointer: Path) -> Path | None:
 
 
 def resolve() -> tuple[Path, str]:
-    explicit = os.environ.get("SMARTTHINK_VAULT", "").strip()
+    raw = os.environ.get("SMARTTHINK_VAULT")
+    explicit = (raw or "").strip()
     if explicit:
-        return Path(os.path.abspath(Path(explicit).expanduser())), "env"
+        path = Path(explicit).expanduser()
+        if not path.is_absolute():
+            print(
+                f"warning: SMARTTHINK_VAULT '{explicit}' is relative; resolved against {os.getcwd()}",
+                file=sys.stderr,
+            )
+        return Path(os.path.abspath(path)), "env"
+    if raw is not None and raw != "":
+        print("warning: SMARTTHINK_VAULT is blank; treating it as unset", file=sys.stderr)
     target = read_pointer(default_vault() / "vault-pointer")
     if target is not None:
         return Path(os.path.abspath(target)), "pointer"

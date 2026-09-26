@@ -55,7 +55,10 @@ fi
 # 0. Leftovers from a copy install (real files instead of symlinks) shadow the bare names and
 # block the links below. scripts/legacy-install.py recognizes them by content; they are moved to
 # a backup, never deleted, and only when asked.
-LEFTOVERS="$(python3 "$LEGACY" detect)"
+if ! LEFTOVERS="$(python3 "$LEGACY" detect)"; then
+  echo "ERROR: could not check for leftovers of an earlier install (see the message above). Nothing was changed."
+  exit 1
+fi
 if [ -n "$LEFTOVERS" ]; then
   if [ "$MIGRATE_LEGACY" -eq 0 ]; then
     echo "ERROR: an earlier SmartThink install left real files that shadow this one:"
@@ -66,7 +69,11 @@ if [ -n "$LEFTOVERS" ]; then
     exit 1
   fi
   echo "Moving leftovers of an earlier install to a backup:"
-  python3 "$LEGACY" migrate | sed 's/^/  /'
+  if ! MOVED="$(python3 "$LEGACY" migrate)"; then
+    echo "ERROR: moving the leftovers failed (see the message above). Check ~/.claude/.backup/ before re-running."
+    exit 1
+  fi
+  printf '%s\n' "$MOVED" | sed 's/^/  /'
   echo ""
 fi
 
@@ -86,10 +93,21 @@ if [ "${#BLOCKED[@]}" -gt 0 ]; then
   for reason in "${BLOCKED[@]}"; do
     echo "ERROR: $reason"
   done
-  echo "These are not SmartThink files, so they were not moved. Nothing was changed."
+  echo "They were not recognized as leftovers of an earlier SmartThink install, so they were not"
+  echo "moved. Nothing was changed."
   echo "Back them up or remove them manually, then re-run install.sh."
   exit 1
 fi
+
+# A regular /st command that is not a SmartThink leftover is the user's own. It does not block
+# the install (the skill still opens as /smartthink), but say so before anything changes.
+for f in "${COMMAND_FILES[@]}"; do
+  target="$COMMANDS_TARGET/$f"
+  if [ -e "$target" ] && [ ! -L "$target" ]; then
+    echo "WARNING: $target exists as a regular file and will be left alone."
+    echo "         The /st alias will not be installed; use /smartthink instead."
+  fi
+done
 
 mkdir -p "$HOME/.claude/skills" "$AGENTS_TARGET" "$COMMANDS_TARGET"
 
@@ -131,9 +149,7 @@ for f in "${COMMAND_FILES[@]}"; do
   if [ -L "$target" ]; then
     rm "$target"
   elif [ -e "$target" ]; then
-    echo "WARNING: $target exists as a regular file. Leaving it alone."
-    echo "         The /st alias will not be installed; use /smartthink instead."
-    continue
+    continue  # the user's own command, announced in the preflight
   fi
   ln -s "$COMMANDS_SOURCE/$f" "$target"
   echo "Command linked : $target -> $COMMANDS_SOURCE/$f"

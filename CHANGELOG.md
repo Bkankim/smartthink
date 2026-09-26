@@ -22,6 +22,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
   `~/.claude/.backup/smartthink-legacy-<timestamp>/`. Nothing is deleted.
 - **`install.sh` no longer half-installs.** Every target is checked before anything changes;
   previously a blocked agent file left the skill linked and the rest missing.
+- **When the resolver cannot run, no other vault is invented.** A permission-denied resolver call
+  used to lead the model to try `/tmp` or a directory inside the repository. The skill now falls
+  back to an inline answer without pack files and reports the failed command. Scripts are called
+  by one absolute path instead of a compound command that needs approval on every run.
+- The resolver warns when `SMARTTHINK_VAULT` is relative (resolved against the current directory)
+  or blank (treated as unset).
 
 ### Added
 
