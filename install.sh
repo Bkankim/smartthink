@@ -11,6 +11,15 @@ COMMANDS_TARGET="$HOME/.claude/commands"
 RESOLVER="$SCRIPT_DIR/scripts/resolve-vault.py"
 AGENT_FILES=(st-thinker.md st-armorer.md)
 COMMAND_FILES=(st.md)
+LEGACY="$SCRIPT_DIR/scripts/legacy-install.py"
+
+MIGRATE_LEGACY=0
+for arg in "$@"; do
+  case "$arg" in
+    --migrate-legacy) MIGRATE_LEGACY=1 ;;
+    *) echo "usage: ./install.sh [--migrate-legacy]"; exit 2 ;;
+  esac
+done
 
 echo "SmartThink Installer"
 echo "===================="
@@ -43,35 +52,66 @@ if [ ! -d "$HOME/.claude" ]; then
   echo "Install Claude Code first: https://docs.anthropic.com/en/docs/claude-code"
 fi
 
+# 0. Leftovers from a copy install (real files instead of symlinks) shadow the bare names and
+# block the links below. scripts/legacy-install.py recognizes them by content; they are moved to
+# a backup, never deleted, and only when asked.
+LEFTOVERS="$(python3 "$LEGACY" detect)"
+if [ -n "$LEFTOVERS" ]; then
+  if [ "$MIGRATE_LEGACY" -eq 0 ]; then
+    echo "ERROR: an earlier SmartThink install left real files that shadow this one:"
+    printf '%s\n' "$LEFTOVERS" | sed 's/^/  /'
+    echo ""
+    echo "Nothing was changed. To move them to ~/.claude/.backup/ and install, run:"
+    echo "  ./install.sh --migrate-legacy"
+    exit 1
+  fi
+  echo "Moving leftovers of an earlier install to a backup:"
+  python3 "$LEGACY" migrate | sed 's/^/  /'
+  echo ""
+fi
+
+# 1. Preflight: every target is checked before anything changes, so a blocked target can
+# never leave a half-finished install behind.
+BLOCKED=()
+if [ -e "$SKILL_TARGET" ] && [ ! -L "$SKILL_TARGET" ]; then
+  BLOCKED+=("$SKILL_TARGET exists as a directory (not a symlink)")
+fi
+for f in "${AGENT_FILES[@]}"; do
+  target="$AGENTS_TARGET/$f"
+  if [ -e "$target" ] && [ ! -L "$target" ]; then
+    BLOCKED+=("$target exists as a regular file (not a symlink)")
+  fi
+done
+if [ "${#BLOCKED[@]}" -gt 0 ]; then
+  for reason in "${BLOCKED[@]}"; do
+    echo "ERROR: $reason"
+  done
+  echo "These are not SmartThink files, so they were not moved. Nothing was changed."
+  echo "Back them up or remove them manually, then re-run install.sh."
+  exit 1
+fi
+
 mkdir -p "$HOME/.claude/skills" "$AGENTS_TARGET" "$COMMANDS_TARGET"
 
-# 1. Skill symlink (SKILL.md + references/ + references/index.json + .data/ seeds)
+# 2. Skill symlink (SKILL.md + references/ + references/index.json + .data/ seeds)
 if [ -L "$SKILL_TARGET" ]; then
   echo "Existing skill symlink found. Replacing..."
   rm "$SKILL_TARGET"
-elif [ -d "$SKILL_TARGET" ]; then
-  echo "ERROR: $SKILL_TARGET exists as a directory (not a symlink)."
-  echo "Back it up or remove it manually, then re-run install.sh."
-  exit 1
 fi
 ln -s "$SKILL_SOURCE" "$SKILL_TARGET"
 echo "Skill linked   : $SKILL_TARGET -> $SKILL_SOURCE"
 
-# 2. Agent definitions (st-thinker = report path, st-armorer = arming path)
+# 3. Agent definitions (st-thinker = report path, st-armorer = arming path)
 for f in "${AGENT_FILES[@]}"; do
   target="$AGENTS_TARGET/$f"
   if [ -L "$target" ]; then
     rm "$target"
-  elif [ -e "$target" ]; then
-    echo "ERROR: $target exists as a regular file (not a symlink)."
-    echo "Back it up or remove it manually, then re-run install.sh."
-    exit 1
   fi
   ln -s "$AGENTS_SOURCE/$f" "$target"
   echo "Agent linked   : $target -> $AGENTS_SOURCE/$f"
 done
 
-# 2b. An older release installed agent definitions this version no longer ships. Those
+# 3b. An older release installed agent definitions this version no longer ships. Those
 # symlinks now dangle. Clear the ones that point into this repo and no longer resolve;
 # links owned by anything else are left alone.
 for target in "$AGENTS_TARGET"/*.md; do
@@ -85,7 +125,7 @@ for target in "$AGENTS_TARGET"/*.md; do
   esac
 done
 
-# 3. /st command alias (the skill itself is invoked as /smartthink)
+# 4. /st command alias (the skill itself is invoked as /smartthink)
 for f in "${COMMAND_FILES[@]}"; do
   target="$COMMANDS_TARGET/$f"
   if [ -L "$target" ]; then
@@ -99,7 +139,7 @@ for f in "${COMMAND_FILES[@]}"; do
   echo "Command linked : $target -> $COMMANDS_SOURCE/$f"
 done
 
-# 4. Vault (lives OUTSIDE the repo so your profile and insights never get committed).
+# 5. Vault (lives OUTSIDE the repo so your profile and insights never get committed).
 # scripts/resolve-vault.py owns the path rules and the seeding; this script only reports.
 # profile.md is intentionally NOT seeded: its absence is the signal that tells SmartThink to
 # suggest /st init, which is what actually fills the profile in.
