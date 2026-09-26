@@ -1166,6 +1166,36 @@ def check_vault_resolver_wiring() -> Result:
     return ok("SKILL.md, lifecycle.md and both installers resolve {VAULT} through resolve-vault.py")
 
 
+# Issue #14: a rule path with a single leading / is relative to the settings file, so the vault
+# never matches, and a hardcoded ~/.claude/settings.json ignores CLAUDE_CONFIG_DIR.
+PERMISSION_RULE_LEFTOVERS = (
+    (r"Edit\(\s*[<{]VAULT[>}]", "vault placeholder rule expands to a single-/ path"),
+    (r"Edit\(/(?!/)", "single-/ rule path is relative to the settings file"),
+    (r"~/\.claude/settings\.json", "hardcoded settings file ignores CLAUDE_CONFIG_DIR"),
+)
+# A line that names the single-/ form only to forbid it or flag it as NG is allowed.
+PERMISSION_RULE_WARNINGS = ("쓰지 마라", "NG", "매칭 안 됨")
+
+
+def check_permission_rule_format() -> Result:
+    """init/status must install and accept only ~/ or // vault rules in the resolved settings file."""
+    problems: list[str] = []
+    for path in (REFERENCES_DIR / "lifecycle.md", SKILL_MD):
+        for number, line in enumerate((read_text(path) or "").splitlines(), start=1):
+            for pattern, reason in PERMISSION_RULE_LEFTOVERS:
+                if not re.search(pattern, line):
+                    continue
+                if pattern.startswith(r"Edit\(/") and any(word in line for word in PERMISSION_RULE_WARNINGS):
+                    continue
+                problems.append(f"{rel(path)}:{number}: {reason}: {line.strip()}")
+    lifecycle = read_text(REFERENCES_DIR / "lifecycle.md") or ""
+    if "--permission-rule" not in lifecycle:
+        problems.append(f"{rel(REFERENCES_DIR / 'lifecycle.md')}: does not take the rule from resolve-vault.py --permission-rule")
+    if problems:
+        return bad(f"{len(problems)} permission rule leftover(s)", problems)
+    return ok("lifecycle.md takes the vault rule and settings path from resolve-vault.py --permission-rule")
+
+
 # Issue #9: without a stated signal the model defaults to interactive and ends the
 # headless turn at the gate. The signals must be tool-free (Bash env reads can be denied).
 HEADLESS_SIGNALS = ("### 헤드리스 판별", "Claude Agent SDK", "AskUserQuestion")
@@ -1690,6 +1720,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("E", "schema: profile.md six blocks in order", check_profile_blocks),
     ("E", "schema: shipped .data is a blank seed", check_data_is_empty_seed),
     ("E", "vault: {VAULT} comes from resolve-vault.py", check_vault_resolver_wiring),
+    ("E", "vault: permission rule is ~/ or // in the resolved settings", check_permission_rule_format),
     ("F", "v2: no --deep mode in SKILL.md", check_no_deep_flag),
     ("F", "v2: SKILL.md frontmatter has no effort/argument-hint", check_skill_frontmatter_clean),
     ("F", "v2: no legacy prefix alias mapping", check_no_legacy_prefix_aliases),
