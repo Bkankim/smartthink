@@ -1,0 +1,13 @@
+{
+  "task": "지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘",
+  "interpretation": "주제형 입력(구체 시스템 정보 없음). 예상 작업 A: 병목·실패 모드 진단과 3~5년 로드맵 / B: 자체 고도화 vs 광역·국가 통합 플랫폼 합류 vs 벤더 SaaS 전환 비교 / C: 수요 변동·자료구입비 비중 하락·기술 변화에 견디는 안티프래질 장기 전략 설계.",
+  "cynefin": "Complex",
+  "classification": "전략 수립",
+  "modules": ["core-engines", "cognitive-arsenal", "anti-fragile-strategy", "pattern-synthesis"],
+  "budget": 120000,
+  "research": true,
+  "profile_version": null,
+  "est_tokens": { "pack": 122243, "agent": 165000 },
+  "created": "2026-09-27T00:07:29+09:00",
+  "harness": "claude-code"
+}

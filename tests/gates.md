@@ -217,16 +217,25 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 
 ### T12. 헤드리스 `claude -p`
 
-- **목적**: 비대화식 실행에서 게이트가 자동 진행되고 120K 상한 및 절삭 기록이 적용되는지 확인한다.
-- **사전 조건**: `claude -p` 사용 가능, 새 임시 vault, 리포지터리 루트에서 플러그인 디렉터리를 전달할 수 있다.
-- **입력**: `SMARTTHINK_VAULT="$ST_VAULT" claude --plugin-dir . -p '/st --budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘'`
+- **목적**: 비대화식 실행에서 게이트가 자동 진행되고 120K 상한 및 절삭 기록이 적용되는지 확인한다. 두 호출 경로(`/st` 별칭과 `/smartthink:smartthink` 직접 호출)를 모두 본다.
+- **사전 조건**: `claude -p` 사용 가능, 호출 경로마다 새 임시 vault, 리포지터리 루트를 플러그인 디렉터리로 전달할 수 있다.
+  - Claude Code 세션 안에서 중첩 실행하면 자식 프로세스는 로그인 정보 대신 `CLAUDE_CODE_OAUTH_TOKEN`만 읽는다. 이 변수를 자식 env에만 넣는다(없으면 "Not logged in", exit 1). 토큰 값은 어떤 증거에도 남기지 않는다.
+  - 사용자 레벨 정의와 CLAUDE.md·훅을 배제하려고 격리 `CLAUDE_CONFIG_DIR`에서 돌릴 때는 그 디렉터리의 `settings.json`에 allow 규칙을 넣는다. `-p` 자식은 승인 프롬프트에 답할 수 없어 규칙이 없으면 Bash·쓰기가 전부 거부된다(T14). 예: `"allow": ["Bash", "Read", "Glob", "Grep", "Edit(//<임시 vault 절대경로>/**)", "WebSearch", "WebFetch", "Agent", "Skill"]`, `"deny": ["Read(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]`. 절대경로 규칙은 `//`로 시작한다(`/`는 설정 파일 기준 상대경로). 쓰기 규칙은 `Edit(...)`가 모든 파일 편집 도구를 덮는다. 넣은 settings.json 원문을 증거에 남긴다.
+- **입력**: 우회 문구 없이 원문 그대로 두 경로를 각각 실행한다.
+  - `/st` 경로: `SMARTTHINK_VAULT="$ST_VAULT" claude --plugin-dir . -p '/st --budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘'`
+  - 직접 호출 경로: `SMARTTHINK_VAULT="$ST_VAULT" claude --plugin-dir . -p '/smartthink:smartthink --budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘'`
+  - 회귀 확인용으로 T2 입력(`--budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘`)도 두 경로로 돌린다.
+- **로딩된 SKILL.md 확인**: `-p` 표준 출력에는 마지막 메시지만 나오므로 세션 트랜스크립트(`<설정 디렉터리>/projects/<cwd 슬러그>/*.jsonl`)에서 `Base directory for this skill:` 줄을 찾아 리포 SKILL.md인지 확인하고 증거에 남긴다. 실제 설정에서는 사용자 레벨 심링크(`~/.claude/skills/smartthink`, `~/.claude/commands/st.md`)가 다른 체크아웃을 가리킬 수 있다. `/st`는 그 경로에서 어느 명령 정의가 잡혔는지(사용자 레벨 st.md 또는 플러그인 `smartthink:st`)도 기록한다.
 - **통과 기준**:
-  - 대화형 Enter나 예산 답을 기다리지 않고 무장 게이트를 자동 진행한다.
-  - 출력에 헤드리스 상한 120K가 적용되었음이 드러난다. 전달한 `--budget 200000`이 120K보다 우선하지 않는다.
-  - 추정치가 120K를 넘으면 리서치 축소 또는 OFF, ★ 낮은 모듈 제외, 적용 레이어 축약의 순서 중 실제 적용한 절삭과 이유가 출력에 남는다.
+  - **비대화식 지시 문구 없이 원문 입력만으로** 두 경로 모두 팩(`pack.md`+`manifest.json`)이 완성된다. 게이트에서 턴이 끝나거나 "진행할까요?"로 끝나면 FAIL이다.
+  - 대화형 Enter나 예산 답을 기다리지 않고 무장 게이트를 자동 진행한다. 헤드리스에서 6항목 게이트 블록 출력은 선택이다(SKILL.md 4단계). 판정은 아래 표준 출력 요약 줄로 한다.
+  - `-p` 표준 출력에는 마지막 응답만 남으므로, 표준 출력에 `헤드리스: 자동 진행 | 상한 NK | 절삭: … | 복원: 없음 | 팩: …` 요약 줄이 있다. 이 줄이 필수 판정 근거다.
+  - 출력에 헤드리스 상한 120K가 적용되었음이 드러난다. 전달한 `--budget 200000`이 120K보다 우선하지 않는다(manifest `budget`이 120000 이하). 게이트 추정치가 상한 이하여야 한다. 완성 팩의 실측 `est_tokens.pack`이 상한을 넘는 것은 절삭 1패스·복원 없음 규칙상 FAIL이 아니며, 그 초과가 출력에 고지되어 있으면 된다.
+  - 추정치가 120K를 넘으면 SKILL.md의 "예산 초과 시 절삭 순서"대로 실제 적용한 절삭과 이유, 복원 여부가 출력에 남는다.
   - 절삭이 없어도 자동 진행 결과, 팩 경로, 브리핑, 턴 종료가 출력에 남는다.
-- **증거**: `T12-output.txt`에 표준 출력과 표준 오류, `T12-manifest.json`과 `T12-pack.md`에 생성 산출물을 남긴다.
-- **실패 시 흔한 원인**: 헤드리스가 사용자 입력을 대기함, 120K 대신 사용자가 준 더 큰 예산을 사용함, 절삭 결과를 출력에 남기지 않음.
+  - 각 팩을 `python3 scripts/check-structure.py --pack <팩 디렉터리>`로 검사해 `pack: 5 passed, 0 failed` 종료 코드 0이다.
+- **증거**: 경로마다 `T12-rerun-<경로>-output.txt`(표준 출력·표준 오류, 로딩된 SKILL.md 경로, 사용한 설정), `T12-rerun-<경로>-pack.md`, `T12-rerun-<경로>-manifest.json`을 남긴다. 최초 실행(2026-09-08) 증거는 `T12-output.txt`, `T12-manifest.json`, `T12-pack.md`다.
+- **실패 시 흔한 원인**: 헤드리스 판별 신호를 보지 않고 대화형으로 기본값을 잡아 게이트에서 턴을 끝냄(#9), 120K 대신 사용자가 준 더 큰 예산을 사용함, 절삭 결과를 출력에 남기지 않음, 중첩 실행에서 `CLAUDE_CODE_OAUTH_TOKEN` 누락, 격리 설정에 allow 규칙 누락.
 
 ### T13. Codex 인라인 경로
 
@@ -269,7 +278,7 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 | `/smartthink` 단축 호출이 되는가, 아니면 네임스페이스가 붙는가 | T11 | **네임스페이스 필수: `/smartthink:smartthink`만 v3를 연다.** bare `/smartthink`·`/st`·플러그인 별칭 `/smartthink:st`는 모두 이 머신의 전역 v2(`~/.claude/skills/smartthink`, `~/.claude/commands/st.md`)로 해석됨(Base directory 실측). 에이전트도 bare `st-armorer`는 not found, bare `st-thinker`는 전역 v2 정의를 가리킴 |
 | 백그라운드 Write에서 권한 프롬프트가 뜨는가 | T9 | **관찰 불가(bypass permissions 모드 세션)**. 규칙 없음/있음 두 시도 모두 프롬프트 없이 Write 성공. 일반 권한 모드 세션에서 재실측 필요. 규칙 설치 머지 자체는 정상(allow 배열 신설 + `Edit(<VAULT>/**)` 1개) |
 | SendMessage 재개가 동작하는가 | T10 | **동작함**(T5·T10). 첫 보고서 후 SendMessage → `Resuming agent <같은 id>`로 같은 thinker가 in-context 개정본 반환, 확정 신호도 같은 경로로 전달돼 Step 5 실행. 재스폰 없음 |
-| 헤드리스에서 게이트 자동 진행이 되는가 | T12 | **됨**. `claude -p`가 Enter 대기 없이 게이트 자동 진행, `--budget 200000`을 무시하고 120K 상한 적용(manifest.budget "120000"), 절삭 내역 출력, 팩·브리핑·턴 종료. 단 중첩 자식 프로세스는 `CLAUDE_CODE_OAUTH_TOKEN`이 없으면 "Not logged in"(문서 원문 명령은 exit 1) |
+| 헤드리스에서 게이트 자동 진행이 되는가 | T12 | **됨(2026-09-26 #9 수정 후)**. 수정 전에는 판별 절차가 없어 설정에 따라 갈림: 격리 설정은 `/st`·`/smartthink:smartthink` 모두 게이트에서 턴 종료, 실제 설정은 자동 진행(I9-repro-R1~R4). 0단계에 도구 호출 없는 판별 신호(시스템 프롬프트 `Claude Agent SDK` 정체성 문장, `AskUserQuestion` 부재)와 4단계·`--budget` 절 안 헤드리스 분기를 넣은 뒤, 우회 문구 없는 원문 입력 6회(두 경로 x 실제·격리 설정, T2 입력 두 경로)가 모두 팩 완성, `--budget 200000`은 120K로(manifest.budget 120000), `--budget 60000`은 60K 유지, 표준 출력 요약 줄에 절삭·복원 기록. Bash로 `CLAUDE_CODE_ENTRYPOINT` 읽기는 auto 모드 `-p`에서 승인 거부(I9-repro-probe). 중첩 자식은 `CLAUDE_CODE_OAUTH_TOKEN` 필요 |
 
 ## 5. 결과 요약
 
@@ -290,5 +299,7 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 | T11 | PASS | 2026-09-08 | T11-skills.txt, T11-transcript.md, T11-observation.md | 실제 호출 이름 `/smartthink:smartthink`. `/st`·`/smartthink`·`/smartthink:st`는 전역 v2로 감. agents 등록 필드 불필요 |
 | T11 | PASS | 2026-09-26 | T11-rerun-st.txt, T11-rerun-agents.txt | 재실측(#2 할 일 3, 3.0.1 설치 후, 실제 HOME 새 헤드리스 세션, `--model opus`, `SMARTTHINK_VAULT`=임시). bare `/st`가 v3 게이트(`━━ SmartThink 무장 게이트 ━━`, 비용 2단위: 팩 약 144K / 서브에이전트 약 157K)를 띄움. 에이전트 목록에 `st-searcher` 없음, bare `st-thinker`는 리포 v3 정의 심링크. resolver가 임시 env vault에 시드, 실제 기본 vault `find -newer` 비어 있음 |
 | T12 | PASS | 2026-09-08 | T12-output.txt, T12-manifest.json, T12-pack.md | run1(문서 원문)은 Not logged in exit 1(중첩 자식 인증). run2(`CLAUDE_CODE_OAUTH_TOKEN` 주입)에서 자동 진행·120K 상한·절삭 출력·턴 종료. 헤드리스도 `/st`가 v2를 먼저 열고 스스로 v3 재호출 |
+| T12 | PASS | 2026-09-26 | T12-rerun-{st,direct}-{iso,real}-{output.txt,pack.md,manifest.json}, T12-rerun-t2-{st,direct}-iso-{output.txt,pack.md,manifest.json}, I9-repro-R1~R4.txt, I9-repro-probe.txt | 재실측(#9 수정 후, `--model opus`, 비대화식 지시 문구 없음, 임시 vault·임시 cwd). T12 입력 `/st`·`/smartthink:smartthink` x 격리·실제 설정 4회와 T2 입력 두 경로(격리) 2회 전부 게이트에서 멈추지 않고 팩 완성, 로딩된 SKILL.md는 모두 워크트리. manifest.budget: T12 120000(`--budget 200000` 미우선), T2 60000. 표준 출력에 `헤드리스: 자동 진행 \| 상한 NK \| 절삭 … \| 복원: 없음 \| 팩 …` 줄 6/6. 사본 `--pack` H 5/5 exit 0 6/6. 비고: 6항목 게이트 블록은 트랜스크립트 1/6(st-iso)만 표시(헤드리스에서 선택). direct-iso는 게이트 추정 116.6K ≤ 120K였고 완성 팩 실측 est 127169 초과를 출력에 고지(기준 충족). 격리 설정 `/st`는 플러그인 `smartthink:st`로 해석 |
+| T12 | PASS | 2026-09-27 | T12-rerun-st-real2-output.txt, T12-rerun-st-real2-pack.md, T12-rerun-st-real2-manifest.json | 확인 재실측(final-review 20260926-234935 후속 판정 반영: 헤드리스 게이트 블록 선택·요약 줄 필수, 판별은 신호1 AND 신호2 또는 신호3, 6단계 요약 줄 연결). `/st` 실제 설정, 원문 입력, 우회 문구 없음. 팩 완성, 로딩 SKILL.md 워크트리, manifest.budget 120000(`--budget 200000` 미우선), 표준 출력 요약 줄 있음(`절삭: 메타인지 제외(게이트 추정 141.7K → 116.6K)`), 사본 `--pack` H 5/5 exit 0. 실측 est_tokens.pack 122243이 상한을 2.2K 넘었고 절삭 1패스 규칙에 따라 재절삭 없이 출력에 고지(기준 충족) |
 | T13 | BLOCKED | 2026-09-08 | T13-blocked.md | codex exec에서 `/smartthink` 미등록(자유 텍스트로 처리). cwd가 리포라 SKILL.md를 읽어 게이트만 출력, 인라인 안내문 없음, 팩 없음 |
 | T14 | BLOCKED | 2026-09-26 | T14-output.txt, T14-blocked.md | 격리 HOME에 권한 허용 규칙이 없어 `-p` 자식의 resolver 호출 8회가 전부 승인 대기로 거부, 팩 미생성. resolver 단위 출력 source=env, 실제 기본 vault `find -newer` 비어 있음. 자식이 /tmp·리포 안에 vault 즉흥 생성 시도(거부) → SKILL.md에 금지 명시. 복합 명령 호출은 절대경로 한 줄로 교체 |
