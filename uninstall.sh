@@ -6,7 +6,13 @@ AGENTS_SOURCE="$SCRIPT_DIR/agents"
 SKILL_TARGET="$HOME/.claude/skills/smartthink"
 AGENTS_TARGET="$HOME/.claude/agents"
 COMMANDS_TARGET="$HOME/.claude/commands"
-if ! VAULT="$(python3 "$SCRIPT_DIR/scripts/resolve-vault.py" | python3 -c 'import json, sys; print(json.load(sys.stdin)["path"])')"; then
+# Removing links needs no Python; only the vault path and the leftover check do. Without python3
+# the uninstaller still removes the links and says what it skipped.
+HAVE_PYTHON=1
+command -v python3 >/dev/null 2>&1 || HAVE_PYTHON=0
+if [ "$HAVE_PYTHON" -eq 0 ]; then
+  VAULT="your SmartThink vault (python3 not found, so its path was not resolved)"
+elif ! VAULT="$(python3 "$SCRIPT_DIR/scripts/resolve-vault.py" | python3 -c 'import json, sys; print(json.load(sys.stdin)["path"])')"; then
   echo "ERROR: could not resolve the vault path (see the message above). Nothing was changed."
   exit 1
 fi
@@ -28,7 +34,10 @@ echo ""
 
 # Leftovers from a copy install are real files the symlink removal below would skip.
 # scripts/legacy-install.py recognizes them by content and moves them to a backup on request.
-if ! LEFTOVERS="$(python3 "$LEGACY" detect)"; then
+if [ "$HAVE_PYTHON" -eq 0 ]; then
+  echo "WARNING: python3 not found, so leftovers of an earlier copy install were not checked."
+  LEFTOVERS=""
+elif ! LEFTOVERS="$(python3 "$LEGACY" detect --blocking)"; then
   echo "ERROR: could not check for leftovers of an earlier install (see the message above). Nothing was changed."
   exit 1
 fi
@@ -42,7 +51,7 @@ if [ -n "$LEFTOVERS" ]; then
     exit 1
   fi
   echo "Moving leftovers of an earlier install to a backup:"
-  if ! MOVED="$(python3 "$LEGACY" migrate)"; then
+  if ! MOVED="$(python3 "$LEGACY" migrate --blocking)"; then
     echo "ERROR: moving the leftovers failed (see the message above). Check ~/.claude/.backup/ before re-running."
     exit 1
   fi
@@ -98,3 +107,7 @@ echo ""
 echo "Uninstall complete."
 echo "Your profile, evolution state and packs are preserved in $VAULT"
 echo "Delete that directory manually if you want a full reset."
+POINTER="$HOME/.claude/smartthink-vault/vault-pointer"
+if [ -f "$POINTER" ]; then
+  echo "Also delete $POINTER for a full reset; otherwise a reinstall resolves the vault through it again."
+fi
