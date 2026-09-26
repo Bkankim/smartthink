@@ -77,3 +77,21 @@ E       KeyError: 'read_rules'
 tests/test_permission_bundle.py:115: KeyError
 2 failed
 ```
+
+## final-review 20260927-072558 후속
+
+### S2-6 resolver --permission-rule이 vault_writable을 낸다(status의 `test -w` 대체, (a)1)
+
+```
+E       KeyError: 'vault_writable'
+tests/test_permission_bundle.py:139: KeyError
+1 failed, 6 deselected in 0.04s
+```
+
+### S1-3 lifecycle.md의 인벤토리 밖 Bash(`test -w`, `ls -la`)가 D를 FAIL시킨다(재발 방지)
+
+```
+E               AssertionError: 0 != 1 : PASS A. layout: required paths exist
+E               40 passed, 0 failed, 5 skipped
+E               pack: 0 passed, 0 failed, 5 skipped
+```

@@ -125,6 +125,34 @@ class PermissionBundleTest(unittest.TestCase):
         result = self.bundle(self.root / "plugin" / "scripts")
         self.assertEqual(result["read_rules"], [result["read_rule"]])
 
+    def test_vault_writable_replaces_the_status_test_w(self) -> None:
+        # final-review 20260927-072558 (a)1: status judged the vault with Bash `test -w {VAULT}`,
+        # outside the working directory and outside the rule bundle. The resolver reports it, judged
+        # on the nearest existing ancestor as install.sh does (a vault not created yet is writable
+        # when its parent is).
+        self.install_copy(self.root / "plugin")
+        scripts = self.root / "plugin" / "scripts"
+        parent = self.root / "notes"
+        parent.mkdir()
+
+        self.vault = parent / "smartthink"
+        self.assertIs(self.bundle(scripts)["vault_writable"], True)
+        self.vault.mkdir()
+        self.assertIs(self.bundle(scripts)["vault_writable"], True)
+
+        locked = self.root / "locked"
+        locked.mkdir()
+        self.vault = locked / "smartthink"
+        locked.chmod(0o555)
+        try:
+            self.assertIs(self.bundle(scripts)["vault_writable"], False)
+        finally:
+            locked.chmod(0o755)
+
+        # A relative SMARTTHINK_VAULT (used with a warning) walks up to "" and must stop at the cwd.
+        self.vault = Path("rel") / "vault"
+        self.assertIs(self.bundle(scripts)["vault_writable"], True)
+
     def test_module_sizes_replace_the_wc_fallback(self) -> None:
         # final-review 20260927-064432 (a)1: without index.json the gate measured module sizes with
         # Bash `wc -c`, a command outside the rule bundle. The resolver, already allowed, reports them.

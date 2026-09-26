@@ -22,6 +22,7 @@ ARMORER = Path("agents") / "st-armorer.md"
 FALLBACK = Path("skills") / "smartthink" / "references" / "armorer-prompt.md"
 CHECK_LINE = "D. wiring: session Bash instructions are single commands"
 BUNDLE_LINE = "D. wiring: SKILL.md arming Bash stays inside the rule bundle"
+LIFECYCLE_LINE = "D. wiring: lifecycle.md Bash is the bundle or a recorded exception"
 
 # The shapes observed in T9 and T15 (tests/evidence), written the way a doc would show them.
 COMPOUND_BLOCKS = (
@@ -109,6 +110,24 @@ class SessionBashCheckTest(unittest.TestCase):
                 lines = [row for row in result.stdout.splitlines() if BUNDLE_LINE in row]
                 self.assertEqual(len(lines), 1, result.stdout)
                 self.assertTrue(lines[0].startswith("FAIL"), result.stdout)
+
+    def test_lifecycle_bash_outside_the_inventory_fails(self) -> None:
+        # final-review 20260927-072558: status judged the vault with `test -w {VAULT}`, a Bash
+        # outside the rule bundle that no review had listed. lifecycle.md may name only the bundle
+        # and the exceptions recorded in tests/evidence/26-bash-inventory.md.
+        path = self.copy / LIFECYCLE
+        original = path.read_text(encoding="utf-8")
+        for line in ("| vault 쓰기 가능 | `test -w {VAULT}`로 판정 |", "`ls -la {VAULT}/packs`로 최근 팩을 본다."):
+            with self.subTest(line=line):
+                path.write_text(original + "\n" + line + "\n", encoding="utf-8")
+                try:
+                    result = self.run_checker()
+                finally:
+                    path.write_text(original, encoding="utf-8")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                rows = [row for row in result.stdout.splitlines() if LIFECYCLE_LINE in row]
+                self.assertEqual(len(rows), 1, result.stdout)
+                self.assertTrue(rows[0].startswith("FAIL"), result.stdout)
 
     def test_prohibited_or_bundled_commands_in_skill_md_pass(self) -> None:
         path = self.copy / SKILL

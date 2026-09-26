@@ -77,6 +77,8 @@ SKILL.md 경로 규약을 따른다. resolver(`python3 {SCRIPTS_DIR}/resolve-vau
 | git | 최근 50건 (`git log --oneline -50`) |
 | 노트 디렉터리 | 사용자가 지정했을 때만 |
 
+`git log`은 규칙 묶음 밖 Bash지만 남긴다: init 1회의 작업 디렉터리(사용자 프로젝트) 안 읽기이고 무장 경로가 아니다.
+
 원칙:
 
 - **로컬 읽기만 한다. 외부로 아무것도 전송하지 않는다.** 스캔 내용을 검색 쿼리나 웹 요청에
@@ -278,6 +280,7 @@ vault의 Read·Glob은 위 `<RULE>`(Edit)이 덮으므로 vault Read 규칙은 �
    빈 파일을 만들면 사용자가 나중에 원인을 못 찾는다.
 3. **JSON 파싱이 깨져 있으면 쓰지 말고 보고하라.** 깨진 파일을 고치려 들지 마라.
 4. 쓰기 전 백업을 권장한다: `cp "<SETTINGS>" "<SETTINGS>.bak"` (경로는 resolver 출력값을 그대로 쓴다)
+   이 `cp`는 규칙 묶음 밖이지만 남긴다: init은 사용자가 settings 변경 자체를 승인하는 대화형 1회 절차이고, 대상이 `~/.claude` 아래면 Write 도구로 바꿔도 보호 경로 프롬프트가 뜬다.
 5. **기존 내용을 보존하는 머지여야 한다.** 통째 덮어쓰기 금지. 기존 `permissions.allow` 배열에
    항목 하나를 추가하는 것이고, 다른 키·다른 항목은 한 글자도 건드리지 않는다.
 6. **동등한 규칙**이 이미 있으면 중복 추가하지 말고 "이미 있음"이라고 알린다. 동등한 규칙은
@@ -439,7 +442,7 @@ v3 스키마 자체는 `references/analysis-method.md` Step 5의 스키마 절�
 **읽기 전용이다. 아무것도 쓰지 않는다.** vault 시드 생성도, `updated` 갱신도, 팩 삭제도 하지 않는다.
 고칠 게 보이면 **무엇을 하면 되는지 안내만** 하고 사용자가 실행하게 한다.
 `{VAULT}`는 resolver를 **`--ensure` 없이** 실행해 얻는다(`python3 {SCRIPTS_DIR}/resolve-vault.py --permission-rule`).
-같은 출력의 `permission_rule`·`settings_path`·`bash_rules`·`read_rules`를 4절의 권한 규칙 진단에 쓴다.
+같은 출력의 `permission_rule`·`settings_path`·`bash_rules`·`read_rules`·`vault_writable`을 4절의 환경 진단에 쓴다.
 
 ### 1. 프로필 요약
 
@@ -479,7 +482,7 @@ v2 형식(YAML 헤더 없음)이면 그 사실을 표시하고 "첫 `/st retain`
 | Agent 도구 사용 가능 | 현재 세션의 도구 목록 | 인라인 경로로 동작한다. 리서치가 메인 컨텍스트를 소모하고 게이트에 비용이 표시됨 |
 | 사용자 레벨 옛 설치 잔재 | `python3 {SCRIPTS_DIR}/legacy-install.py detect` 출력이 비어 있음 | 복사 설치된 옛 파일이나 옛 체크아웃을 가리키는 링크가 bare 이름(`/st`, `/smartthink`, `st-thinker`)을 선점해 이 버전 대신 열림 |
 | vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고, `pointer`면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`가 가리킨 경로라고, `default`면 `${XDG_DATA_HOME:-~/.local/share}/smartthink`이라고 1줄 표시 |
-| vault 쓰기 가능 | **디렉터리 권한으로 판정**(`test -w {VAULT}`) | 팩·프로필·진화 상태가 기록되지 않음 |
+| vault 쓰기 가능 | **디렉터리 권한으로 판정**: 위 resolver `--permission-rule` 출력의 `vault_writable`(vault가 아직 없으면 가장 가까운 존재 조상 기준). `test -w` 같은 Bash로 따로 재지 마라 | 팩·프로필·진화 상태가 기록되지 않음 |
 | 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`거나 `settings_path`가 `null`이면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: `permission_rule_reason`대로 표시(`home-claude` vault가 `~/.claude` 아래, `protected-folder` 경로에 `.claude`·`.git`·`.vscode`·`.idea` 폴더, `special-characters` 경로에 glob·규칙 문법 문자). 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 그런 폴더·문자가 없는 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소. `settings_path=null`: `CLAUDE_CONFIG_DIR`가 상대경로, 절대경로로 지정하고 init 재실행 |
 | 권한 규칙(스크립트 Bash) | resolver `--permission-rule` 출력의 `bash_rules` 각 항목(또는 init 4절 7번의 동등한 `:*` 표기)이 `settings_path`의 `permissions.allow`에 있으면 OK. 하나라도 없거나 다른 경로의 스크립트만 가리키면 NG. `bash_rules_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음·다른 경로: 무장마다 메인의 vault 해석 Bash나 armorer의 5절 조립 Bash에 승인 프롬프트가 뜸(플러그인 업데이트로 경로가 바뀐 경우 포함), `/st init` 재실행으로 설치. `effective=false`: 스크립트 경로에 공백·셸 특수 문자가 있어 규칙이 매칭되지 않음, 그런 문자가 없는 경로에 설치하면 해소 |
 | 권한 규칙(스킬 Read) | 같은 출력의 `read_rules` 각 항목(또는 init 4절 7번의 동등한 상위 경로 규칙)이 `permissions.allow`에 있으면 OK. 하나라도 없으면 NG. `read_rule_effective`가 `false`면 NG | 없음: 작업 디렉터리 밖 플러그인이면 무장마다 게이트의 `index.json`과 armorer의 모듈 Read에 승인 프롬프트가 뜸, `/st init` 재실행으로 설치 |
