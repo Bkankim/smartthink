@@ -183,3 +183,38 @@ tests/test_resolve_vault.py:383:        self.make_store(".claude/smartthink-vaul
 ```
 
 남은 `smartthink-vault` 언급: CHANGELOG.md(이력), gates.md 260행(T12 예시의 옛 위치 보호 deny, "옛 위치(메인테이너 머신 잔존)" 표기), gates.md 346·368행(T9 기록, 다른 워커 소유라 미수정), tests/의 회귀 픽스처(옛 위치를 무시하는지·check가 잡는지 검증하는 입력).
+
+---
+
+# final-review 20260927-032439 후속 (Spec MISSING 판정 반영)
+
+## 사이클 13 (c)2: `--time-limit`이 후보 기술(`describe`)까지 포함한 전체 스캔에 걸린다, 초과 시 `partial` 경고와 부분 결과
+
+```
+E       AssertionError: 3000 not less than 3000
+FAILED tests/test_resolve_vault.py::CandidatesTest::test_time_limit_also_bounds_describing_candidates
+```
+
+## 사이클 14 (a)2 #23-1: vault 경로에 규칙·glob 문법 문자(`[ ] * ? { } ( )`)가 있으면 `permission_rule_effective=false`, `permission_rule_reason="special-characters"`
+
+```
+E       KeyError: 'permission_rule_reason'
+E               AssertionError: True is not false
+FAILED tests/test_resolve_vault.py::ResolveVaultTest::test_rule_syntax_characters_make_the_rule_ineffective
+```
+
+## 사이클 15 (a)2 #23-2: 상대 `CLAUDE_CONFIG_DIR`면 `settings_path=null`과 stderr 경고
+
+```
+E       AssertionError: '<TMP>/rel-config/settings.json' is not None
+FAILED tests/test_resolve_vault.py::ResolveVaultTest::test_relative_claude_config_dir_leaves_settings_path_empty
+```
+
+## 사이클 16 (a)1: `.claude`·`.git`·`.vscode`·`.idea` 폴더 아래 vault는 `permission_rule_effective=false`, `permission_rule_reason="protected-folder"`
+
+헤드리스 탐침(T15-protected-probe.md) 11회로 보호 경로를 먼저 실측한 뒤 쓴 테스트다.
+
+```
+E               AssertionError: True is not false
+FAILED tests/test_resolve_vault.py::ResolveVaultTest::test_rule_under_protected_folders_is_not_effective
+```

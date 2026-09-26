@@ -63,8 +63,10 @@ v2의 진화 상태는 YAML 헤더 없는 산문 형식이다. 읽기는 그대�
 백그라운드 에이전트가 vault에 Write할 때 권한 프롬프트가 부모 세션에 뜰 수 있다. 그래서
 `st init`이 `resolve-vault.py --permission-rule`의 `permission_rule`(vault가 홈 아래면 `Edit(~/...)`,
 아니면 `Edit(//<절대경로>/**)`)을 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)에
-추가할지 **묻는다**. vault가 `~/.claude` 아래면 Claude Code가 민감 경로로 보고 허용
-규칙과 무관하게 묻기 때문에(`permission_rule_effective: false`) 규칙을 제안하지 않고 vault 이동을 안내한다.
+추가할지 **묻는다**. vault가 `~/.claude` 아래이거나 경로에 `.claude`·`.git`·`.vscode`·`.idea` 폴더가 있으면 Claude Code가
+민감 경로로 보고 허용 규칙과 무관하게 묻기 때문에, 경로에 glob·규칙 문법 문자가 있으면 규칙이 매칭되지
+않을 수 있기 때문에(`permission_rule_effective: false`, 이유는 `permission_rule_reason`) 규칙을 제안하지 않고
+vault 이동을 안내한다. `CLAUDE_CONFIG_DIR`가 상대경로면 `settings_path`가 `null`이라 설치를 제안하지 않는다.
 **승인했을 때만 기록한다**(D31). 거절해도 무장은 동작하며, 매번 권한 프롬프트가 뜰 뿐이다.
 
 ## 프라이버시

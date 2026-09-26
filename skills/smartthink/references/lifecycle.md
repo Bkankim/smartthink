@@ -150,7 +150,7 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
    입력만 보여 주고 묻는다. 건너뛰면 새로 만들기(기본값)로 둔다.
 4. 노트 보관소 후보를 고르면 루트가 아니라 그 후보의 `suggested_vault`(`<보관소>/smartthink/`)를 쓴다.
    **기존 파일은 건드리지 않는다.** `profile.md`와 `packs/`만 그 아래에 추가한다.
-5. 직접 입력한 경로는 절대경로로 받는다. 경로가 `~/.claude` 아래이거나 경로 안에 `.claude`·`.git`
+5. 직접 입력한 경로는 절대경로로 받는다. 경로가 `~/.claude` 아래이거나 경로 안에 `.claude`·`.git`·`.vscode`·`.idea`
    폴더가 있으면 경고한다. Claude Code가 그 아래 쓰기를 보호 경로로 보고 허용 규칙과 무관하게 매번
    묻는다. 사용자가 그래도 쓰겠다고 하면 그대로 쓴다. 노트 보관소 루트를 입력했으면 `<입력>/smartthink/`를
    쓸지 한 번 묻는다.
@@ -196,15 +196,26 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
   (슬래시 두 개 + 앞 `/`를 뺀 절대경로)다.
 - **단일 `/`로 시작하는 `Edit(/<절대경로>/**)`를 쓰지 마라.** Claude Code는 `/`로 시작하는 규칙
   경로를 설정 파일 기준 상대경로로 해석하므로 vault와 매칭되지 않고 프롬프트가 그대로 뜬다(#14).
-- **`permission_rule_effective`가 `false`면 규칙을 제안하지 마라.** vault가 `~/.claude` 아래면 Claude Code가 그 아래 쓰기를 민감 파일로 보고 허용 규칙과
-  무관하게 매번 묻는다. 규칙을 넣어도 프롬프트가 사라지지 않으니 설치하지 말고 이렇게 알린다.
+- **`settings_path`가 `null`이면 규칙을 제안하지 마라.** `CLAUDE_CONFIG_DIR`가 상대경로라서 이 세션이 읽는
+  설정 파일을 resolver가 알 수 없다는 뜻이다(#23). 설치하지 말고 "`CLAUDE_CONFIG_DIR`를 절대경로로 지정한 뒤
+  init을 다시 실행하면 규칙 설치를 다시 묻는다"고 알린다. Bash 조립 규칙도 같은 파일에 들어가므로 함께 뺀다.
+- **`permission_rule_effective`가 `false`면 규칙을 제안하지 마라.** 규칙을 넣어도 프롬프트가 사라지지 않는다.
+  설치하지 말고 `permission_rule_reason`에 맞춰 이유와 대안을 알린다.
+  - `home-claude`: vault가 `~/.claude` 아래다. Claude Code가 그 아래 쓰기를 민감 파일로 보고 허용 규칙과 무관하게
+    매번 묻는다.
+  - `protected-folder`: vault 경로에 `.claude`·`.git`·`.vscode`·`.idea` 폴더가 있다. 리포 안이든 밖이든 Claude
+    Code가 그 아래 쓰기를 민감 파일로 보고 매번 묻는다(#20 헤드리스 탐침).
+  - `special-characters`: vault 경로에 `[ ] * ? { } ( )` 같은 glob·규칙 문법 문자가 있어 규칙이 vault와 매칭되지
+    않을 수 있다(#23). 규칙 문자열은 이스케이프하지 않는다.
 
   ```
-  vault가 ~/.claude 아래라서 Claude Code가 팩 쓰기마다 확인을 받는다(허용 규칙으로 못 없앰).
-  프롬프트를 없애려면 /st init을 다시 실행해 2절에서 ~/.claude 밖 경로를 고르거나,
-  SMARTTHINK_VAULT로 ~/.claude 밖 경로를 지정하면 된다. 그대로 둬도 무장은 동작한다.
-  세션 중에는 프롬프트의 "allow Claude to edit files in its ~/.claude folder for this session"로 넘길 수 있다.
+  vault 위치 때문에 허용 규칙으로 팩 쓰기 확인을 없앨 수 없다(<이유 한 줄>).
+  프롬프트를 없애려면 /st init을 다시 실행해 2절에서 그런 폴더·문자가 없는 경로를 고르거나,
+  SMARTTHINK_VAULT로 그런 경로를 지정하면 된다. 그대로 둬도 무장은 동작한다.
   ```
+
+  `home-claude`면 세션 중에는 프롬프트의 "allow Claude to edit files in its ~/.claude folder for this session"로
+  넘길 수 있다고 덧붙인다.
 
 - `true`일 때만 설치 여부를 **묻는다.**
 
@@ -450,7 +461,7 @@ v2 형식(YAML 헤더 없음)이면 그 사실을 표시하고 "첫 `/st retain`
 | 사용자 레벨 옛 설치 잔재 | `python3 "{SCRIPTS_DIR}/legacy-install.py" detect` 출력이 비어 있음 | 복사 설치된 옛 파일이나 옛 체크아웃을 가리키는 링크가 bare 이름(`/st`, `/smartthink`, `st-thinker`)을 선점해 이 버전 대신 열림 |
 | vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고, `pointer`면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`가 가리킨 경로라고, `default`면 `${XDG_DATA_HOME:-~/.local/share}/smartthink`이라고 1줄 표시 |
 | vault 쓰기 가능 | **디렉터리 권한으로 판정**(`test -w {VAULT}`) | 팩·프로필·진화 상태가 기록되지 않음 |
-| 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: vault가 `~/.claude` 아래라 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 ~/.claude 밖 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소 |
+| 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`거나 `settings_path`가 `null`이면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: `permission_rule_reason`대로 표시(`home-claude` vault가 `~/.claude` 아래, `protected-folder` 경로에 `.claude`·`.git`·`.vscode`·`.idea` 폴더, `special-characters` 경로에 glob·규칙 문법 문자). 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 그런 폴더·문자가 없는 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소. `settings_path=null`: `CLAUDE_CONFIG_DIR`가 상대경로, 절대경로로 지정하고 init 재실행 |
 | 권한 규칙(Bash 조립) | `python3 {SCRIPTS_DIR}/assemble-pack.py --permission-rule`(`{SCRIPTS_DIR}`는 경로 규약 문자열 그대로)의 `permission_rule`과 같은 항목(또는 init 4절 7번의 동등한 `:*` 표기)이 `settings_path`의 `permissions.allow`에 있으면 OK. 없거나 다른 경로의 `assemble-pack.py`만 가리키면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음·다른 경로: 무장마다 armorer의 5절 조립 Bash에 승인 프롬프트가 뜸(플러그인 업데이트로 경로가 바뀐 경우 포함), `/st init` 재실행으로 설치. `effective=false`: 스크립트 경로에 공백·셸 특수 문자가 있어 규칙이 매칭되지 않음, 그런 문자가 없는 경로에 설치하면 해소 |
 | `references/index.json` | 파일 존재 | 게이트의 비용 추정이 사전 계산값 대신 실측 근사로 내려감 |
 | 검색 도구 | WebSearch·WebFetch 사용 가능 여부 | 팩 3절(리서치 합성) 생략, `manifest.research=false` |
@@ -468,6 +479,8 @@ NG 항목이 있으면 **무엇을 하면 되는지 1줄씩** 붙인다. 전부 
   권한 규칙 없음        /st init 을 다시 돌리면 규칙 설치를 다시 물어봄 (거절해도 동작함)
   권한 규칙 형식 틀림   단일 / 규칙은 매칭 안 됨. /st init 을 다시 돌려 ~/ 또는 // 형식 규칙을 설치
   vault가 ~/.claude 아래  팩 쓰기마다 확인이 뜸(규칙으로 못 없앰). /st init 에서 vault를 ~/.claude 밖으로 옮기면 해소
+  vault가 보호 폴더 아래  .claude·.git·.vscode·.idea 폴더 아래라 팩 쓰기마다 확인이 뜸. /st init 에서 그런 폴더 밖 경로를 고르면 해소
+  CLAUDE_CONFIG_DIR 상대경로  설치할 설정 파일을 알 수 없음. CLAUDE_CONFIG_DIR를 절대경로로 지정하고 /st init 재실행
   팩 23개 (상한 20)     {VAULT}/packs/ 에서 오래된 3개를 지울지 확인 (자동 삭제하지 않음)
   옛 설치 잔재          SmartThink 클론에서 ./install.sh --migrate-legacy (플러그인 설치면 ./uninstall.sh --migrate-legacy). 복사본은 ~/.claude/.backup/ 으로 이동만 되고, 옛 체크아웃 링크는 옵션 없이도 교체·제거됨
   st-armorer 없음       install.sh 사용자는 클론에서 ./install.sh 재실행, 플러그인 사용자는 플러그인 재설치
