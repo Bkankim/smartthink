@@ -132,6 +132,7 @@ REQUIRED_PATHS = (
     "tests/gates.md",
     "install.sh",
     "uninstall.sh",
+    "scripts/resolve-vault.py",
     "LICENSE",
 )
 
@@ -1135,6 +1136,36 @@ def check_data_is_empty_seed() -> Result:
     return ok("shipped .data seed is blank (sessions=0, routing_weights empty)")
 
 
+# Prose that let the model pick {VAULT} by judgment. Issue #10: an empty env vault was skipped.
+VAULT_PROSE_LEFTOVERS = (
+    (r"2\s*(?:→|->)\s*3\s*순", "candidate cascade that invites a fallback"),
+    (r"profile\.md가\s*선언한\s*vault", "profile declaration ranked above the env var"),
+    (r"SMARTTHINK_VAULT:-[^}]", "shell default that bypasses the resolver and the pointer"),
+)
+
+
+def check_vault_resolver_wiring() -> Result:
+    """{VAULT} must come from scripts/resolve-vault.py, never from re-derived prose."""
+    resolver = REPO_ROOT / "scripts" / "resolve-vault.py"
+    if not resolver.is_file():
+        return bad(f"{rel(resolver)} is missing", ["The skill and the installers depend on it for {VAULT}."])
+    problems: list[str] = []
+    callers = (SKILL_MD, REFERENCES_DIR / "lifecycle.md", REPO_ROOT / "install.sh", REPO_ROOT / "uninstall.sh")
+    for path in callers:
+        text = read_text(path) or ""
+        if "resolve-vault.py" not in text:
+            problems.append(f"{rel(path)}: does not call resolve-vault.py")
+    prose_files = callers + (DATA_DIR / "README.md",)
+    for path in prose_files:
+        for number, line in enumerate((read_text(path) or "").splitlines(), start=1):
+            for pattern, reason in VAULT_PROSE_LEFTOVERS:
+                if re.search(pattern, line):
+                    problems.append(f"{rel(path)}:{number}: {reason}: {line.strip()}")
+    if problems:
+        return bad(f"{len(problems)} vault resolution leftover(s)", problems)
+    return ok("SKILL.md, lifecycle.md and both installers resolve {VAULT} through resolve-vault.py")
+
+
 # ----------------------------------------------------------------- F. v2 leftovers
 
 
@@ -1629,6 +1660,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("E", "schema: profile.md v3 header", check_profile_schema),
     ("E", "schema: profile.md six blocks in order", check_profile_blocks),
     ("E", "schema: shipped .data is a blank seed", check_data_is_empty_seed),
+    ("E", "vault: {VAULT} comes from resolve-vault.py", check_vault_resolver_wiring),
     ("F", "v2: no --deep mode in SKILL.md", check_no_deep_flag),
     ("F", "v2: SKILL.md frontmatter has no effort/argument-hint", check_skill_frontmatter_clean),
     ("F", "v2: no legacy prefix alias mapping", check_no_legacy_prefix_aliases),

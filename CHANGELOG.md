@@ -2,6 +2,39 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/).
 
+## 3.0.1 (2026-09-26)
+
+### Fixed
+
+- **An explicitly set `SMARTTHINK_VAULT` is always used** ([#10](https://github.com/Bkankim/smartthink/issues/10)).
+  An empty env vault could be judged a test leftover and skipped, so packs landed in the real
+  default vault. `{VAULT}` now comes from `scripts/resolve-vault.py` instead of prose the model
+  interpreted: `SMARTTHINK_VAULT` (used as-is, even when empty or missing) > the
+  `~/.claude/smartthink-vault/vault-pointer` file > the default. The same fallback existed in
+  `migrate-evolution.py`, which could pick the default vault's file when the env vault had none;
+  it now follows the resolver too.
+- **A vault chosen in `/st init` is found again next session.** Nothing used to record it where
+  the next session looks. `init` now writes `vault-pointer`; the profile's vault field is display
+  only.
+- **Leftovers of a copy install no longer shadow this one** ([#2](https://github.com/Bkankim/smartthink/issues/2)).
+  `install.sh` and `uninstall.sh` detect real files left by an earlier copy install, stop without
+  changing anything, and with `--migrate-legacy` move them to
+  `~/.claude/.backup/smartthink-legacy-<timestamp>/`. Nothing is deleted.
+- **`install.sh` no longer half-installs.** Every target is checked before anything changes;
+  previously a blocked agent file left the skill linked and the rest missing.
+- **When the resolver cannot run, no other vault is invented.** A permission-denied resolver call
+  used to lead the model to try `/tmp` or a directory inside the repository. The skill now falls
+  back to an inline answer without pack files and reports the failed command. Scripts are called
+  by one absolute path instead of a compound command that needs approval on every run.
+- The resolver warns when `SMARTTHINK_VAULT` is relative (resolved against the current directory)
+  or blank (treated as unset).
+
+### Added
+
+- `/st status` reports install leftovers, where `{VAULT}` came from, and that a missing
+  `st-armorer` degrades to a `general-purpose` fallback.
+- `tests/test_*.py` (standard-library `unittest`, temporary `HOME` only) and gate T14.
+
 ## 3.0.0 (2026-09-26)
 
 SmartThink stops being an analysis command and becomes a **context arming engine**. It no longer
