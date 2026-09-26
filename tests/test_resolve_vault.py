@@ -203,6 +203,23 @@ class ResolveVaultTest(unittest.TestCase):
 
         self.assertEqual(result["settings_path"], str(self.home / ".claude" / "settings.json"))
 
+    def test_rule_under_home_claude_is_not_effective(self) -> None:
+        # Writes under ~/.claude prompt as sensitive files no matter what the allow rules say.
+        self.assertFalse(self.run_rule()["permission_rule_effective"])
+        self.assertFalse(self.run_rule(vault_env=str(self.home / ".claude" / "other"))["permission_rule_effective"])
+
+    def test_rule_outside_home_claude_is_effective(self) -> None:
+        self.assertTrue(self.run_rule(vault_env=str(self.home / "notes" / "smartthink"))["permission_rule_effective"])
+        self.assertTrue(self.run_rule(vault_env=str(self.root / "outside"))["permission_rule_effective"])
+
+    def test_config_dir_does_not_change_effectiveness(self) -> None:
+        # The sensitive-path check follows HOME, so a vault inside CLAUDE_CONFIG_DIR is fine.
+        config = self.root / "isolated-config"
+
+        result = self.run_rule(vault_env=str(config / "vault"), config_dir=str(config))
+
+        self.assertTrue(result["permission_rule_effective"])
+
     def test_rule_fields_are_opt_in(self) -> None:
         result = self.run_resolver()
 

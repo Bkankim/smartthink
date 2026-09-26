@@ -12,7 +12,9 @@ as-is; it never re-derives the path from prose. Precedence:
 
 Output: {"path": "<absolute path>", "source": "env|pointer|default"}
 --permission-rule adds "permission_rule" (the Edit allow rule `st init` installs for the vault) and
-"settings_path" (${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json, the file it goes into).
+"settings_path" (${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json, the file it goes into), plus
+"permission_rule_effective": false when the vault sits under ~/.claude, which Claude Code treats as
+sensitive and keeps prompting for whatever the allow rules say.
 --ensure also creates packs/ and copies the evolution-state template when absent. profile.md is
 left to `st init`.
 Existing files are never overwritten.
@@ -80,6 +82,16 @@ def permission_rule(vault: Path) -> str:
     return "Edit(~/**)" if relative == Path(".") else f"Edit(~/{relative.as_posix()}/**)"
 
 
+def rule_is_effective(vault: Path) -> bool:
+    # Claude Code prompts for every write under $HOME/.claude ("a sensitive file") even when an
+    # allow rule matches, and this follows HOME, not CLAUDE_CONFIG_DIR (issue #14 probes P1-P6).
+    try:
+        vault.relative_to(Path.home() / ".claude")
+    except ValueError:
+        return True
+    return False
+
+
 def settings_path() -> Path:
     # Claude Code reads user settings from CLAUDE_CONFIG_DIR when it is set, not from ~/.claude.
     config_dir = (os.environ.get("CLAUDE_CONFIG_DIR") or "").strip()
@@ -115,6 +127,7 @@ def main() -> int:
     if arguments.permission_rule:
         result["permission_rule"] = permission_rule(vault)
         result["settings_path"] = str(settings_path())
+        result["permission_rule_effective"] = rule_is_effective(vault)
     print(json.dumps(result, ensure_ascii=False))
     return 0
 
