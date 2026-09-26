@@ -28,7 +28,7 @@ SKILL.md가 서브커맨드로 판정했을 때 Read하는 **절차서**다. SKI
 
 ### `{VAULT}` 해석과 시드
 
-SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --ensure`)가 출력한 `path`만
+SKILL.md 경로 규약을 따른다. resolver(`python3 {SCRIPTS_DIR}/resolve-vault.py --ensure`)가 출력한 `path`만
 쓰고, 여기서 우선순위를 다시 해석하지 마라. `--ensure`가 `packs/`와 빈 `evolution-state.md`를
 만든다. `profile.md`는 시드하지 않는다. 없는 것이 `/st init` 안내 신호이고, init 3단계가 만든다.
 
@@ -76,6 +76,8 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 | `~/.claude` | `CLAUDE.md`, `MEMORY.md` |
 | git | 최근 50건 (`git log --oneline -50`) |
 | 노트 디렉터리 | 사용자가 지정했을 때만 |
+
+`git log`은 규칙 묶음 밖 Bash지만 남긴다: init 1회의 작업 디렉터리(사용자 프로젝트) 안 읽기이고 무장 경로가 아니다.
 
 원칙:
 
@@ -138,7 +140,7 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 
 0. init은 ⑤에서 경로가 확정되기 전에는 resolver를 `--ensure` 없이 실행한다. 기본 위치에 빈 vault를 미리
    만들면 다른 곳을 고른 뒤 쓰이지 않는 폴더가 남는다. 시드는 경로 확정 뒤 `--ensure`로 한다.
-1. `python3 "{SCRIPTS_DIR}/resolve-vault.py" --candidates`를 실행한다. JSON의 `candidates[]`가 기존
+1. `python3 {SCRIPTS_DIR}/resolve-vault.py --candidates`를 실행한다. JSON의 `candidates[]`가 기존
    노트 보관소 후보이고 `create_new.path`가 새로 만들기(기본값)다. 탐지를 직접 흉내 내지 마라.
 2. 후보를 번호 목록으로 보여 준다. 후보마다 `path`, `signals`(등록 목록·표시 파일·이름), `last_modified`,
    `file_count`(대략), `git_repo`, `warnings`를 한 줄로 붙인다. 경고는 풀어서 쓴다. `stale`은 180일 넘게
@@ -166,7 +168,7 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
    - resolver의 `source`가 `env`면 포인터를 쓰지 않는다. env가 항상 이긴다고 알리고, 확정 경로가
      env와 다르면 `SMARTTHINK_VAULT`를 셸 프로필에서 바꾸라고 안내한다.
    - 확정 경로가 `create_new.path`(기본값)가 아니면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`에
-     절대경로 한 줄을 Write한다(디렉터리가 없으면 `mkdir -p`).
+     절대경로 한 줄을 Write한다(Write가 없는 디렉터리를 만든다. `mkdir`을 따로 돌리지 않는다).
    - 확정 경로가 기본값이면 포인터를 쓰지 않는다. 이미 포인터가 있으면 resolver가 계속 그쪽을
      고르므로, 가리키는 경로를 보여 주고 지울지 **묻는다**. 승인했을 때만 지운다.
    - 마지막으로 resolver를 다시 실행해 `path`가 확정 경로와 같은지 확인하고, 다르면 보고한다.
@@ -189,7 +191,7 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 ### 4. 권한 규칙 제안
 
 규칙 문자열과 대상 파일은 **직접 만들지 말고 resolver로 얻는다.**
-`python3 "{SCRIPTS_DIR}/resolve-vault.py" --permission-rule`이 출력한 JSON의
+`python3 {SCRIPTS_DIR}/resolve-vault.py --permission-rule`이 출력한 JSON의
 `permission_rule`이 넣을 규칙이고, `settings_path`가 넣을 파일이다(이하 `<RULE>`, `<SETTINGS>`).
 
 - `<SETTINGS>`는 `${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`이다. `CLAUDE_CONFIG_DIR`로 뜬
@@ -200,7 +202,7 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
   경로를 설정 파일 기준 상대경로로 해석하므로 vault와 매칭되지 않고 프롬프트가 그대로 뜬다(#14).
 - **`settings_path`가 `null`이면 규칙을 제안하지 마라.** `CLAUDE_CONFIG_DIR`가 상대경로라서 이 세션이 읽는
   설정 파일을 resolver가 알 수 없다는 뜻이다(#23). 설치하지 말고 "`CLAUDE_CONFIG_DIR`를 절대경로로 지정한 뒤
-  init을 다시 실행하면 규칙 설치를 다시 묻는다"고 알린다. Bash 조립 규칙도 같은 파일에 들어가므로 함께 뺀다.
+  init을 다시 실행하면 규칙 설치를 다시 묻는다"고 알린다. Bash·Read 규칙도 같은 파일에 들어가므로 함께 뺀다.
 - **`permission_rule_effective`가 `false`면 규칙을 제안하지 마라.** 규칙을 넣어도 프롬프트가 사라지지 않는다.
   설치하지 말고 `permission_rule_reason`에 맞춰 이유와 대안을 알린다.
   - `home-claude`: vault가 `~/.claude` 아래다. Claude Code가 그 아래 쓰기를 민감 파일로 보고 허용 규칙과 무관하게
@@ -221,34 +223,50 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 
 - `true`일 때만 설치 여부를 **묻는다.**
 
-**Bash 조립 규칙 1개도 함께 제안한다(#21).** 팩 5절 원문은 armorer가 Bash로
-`python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir ... --modules ...`를 한 번 실행해 붙인다. Bash 호출은
-Edit 규칙 대상이 아니라서 이 명령만 따로 묻는다. 규칙 문자열도 **직접 만들지 말고 스크립트로 얻는다.**
-`python3 {SCRIPTS_DIR}/assemble-pack.py --permission-rule`이 출력한 JSON의 `permission_rule`이 넣을 규칙이다
-(이하 `<BASH_RULE>`, 모양은 `Bash(python3 <스크립트 절대경로> *)`). 대상 파일은 같은 `<SETTINGS>`다.
+**스크립트 Bash 규칙 2개와 스킬 디렉터리 Read 규칙 1개도 함께 제안한다(#21, #26).** 무장 한 번에 메인 세션은
+`python3 {SCRIPTS_DIR}/resolve-vault.py --ensure`를, armorer는 `python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir ... --modules ...`를
+Bash로 한 번씩 실행하고, 둘 다 `{SKILL_DIR}/references/`를 Read한다. Bash 호출은 Edit 규칙 대상이 아니고, 플러그인
+디렉터리는 사용자의 작업 디렉터리 밖이라 Read마다 묻는다(`tests/evidence/T16-before.md`: 규칙 없이 무장 1회에 Read 프롬프트 9회).
+vault의 Read·Glob은 위 `<RULE>`(Edit)이 덮으므로 vault Read 규칙은 따로 두지 않는다.
 
-- `<BASH_RULE>`은 armorer가 실제로 치는 명령의 앞부분과 글자 그대로 같아야 매칭된다. Claude Code는 Bash
+규칙 문자열도 **직접 만들지 말고 위와 같은 한 번의 호출** `python3 {SCRIPTS_DIR}/resolve-vault.py --permission-rule` 출력에서 얻는다.
+
+- `bash_rules`: 넣을 Bash 규칙 목록(이하 `<BASH_RULES>`, resolver와 assemble-pack 각 1개, 모양은 `Bash(python3 <스크립트 절대경로> *)`).
+  `command_prefixes`는 스크립트별로 세션이 칠 명령의 앞부분이고, 각 규칙은 `Bash(<그 앞부분> *)`다.
+- `read_rules`: 넣을 Read 규칙 목록(이하 `<READ_RULES>`, 경로가 홈 아래면 `Read(~/<홈 기준 경로>/**)`, 아니면 `Read(//<절대경로>/**)`).
+  첫 항목(`read_rule`과 같다)은 스크립트 옆 `skills/smartthink/`다. install.sh 설치면 세션이 `~/.claude/skills/smartthink`(또는
+  `$CLAUDE_CONFIG_DIR/skills/smartthink`) 링크를 거쳐 Read하므로 그 링크 경로 규칙이 뒤에 붙는다. 체크아웃 경로 규칙만으로는 링크 경로 Read가
+  매번 묻는다(`tests/evidence/T16-after.md` install.sh 행). 목록을 통째로 제안하고 통째로 머지한다.
+- 대상 파일은 같은 `<SETTINGS>`다.
+
+- `<BASH_RULES>`는 세션이 실제로 치는 명령의 앞부분과 글자 그대로 같아야 매칭된다. Claude Code는 Bash
   규칙을 명령 문자열로 비교하고 끝의 ` *`가 나머지 인자(따옴표 포함)를 받는다. 경로를 손으로 줄이거나 `~`로 바꾸지 마라.
+  문서의 스크립트 호출이 전부 따옴표 없는 `python3 {SCRIPTS_DIR}/<스크립트>`로 시작하는 이유다(SKILL.md 세션 도구 규율).
+- retain·status가 부르는 `migrate-evolution.py`·`legacy-install.py`도 같은 형식으로 부르지만 무장 경로 밖이라 규칙 묶음에 넣지 않는다. 그 둘은 실행할 때마다 승인 프롬프트가 뜬다.
 - 스크립트는 **호출된 경로 그대로**(심링크를 풀지 않고) 규칙을 만든다. 그러니 `--permission-rule`은 경로 규약의
-  `{SCRIPTS_DIR}` 문자열 그대로, 무장 때 armorer에 Path Variables로 넘기는 것과 같은 문자열로 호출한다. 출력의
-  `command_prefix`가 armorer가 칠 명령의 앞부분이고 `<BASH_RULE>`은 `Bash(<command_prefix> *)`다. 따로 realpath로
-  바꾸면 `/tmp`처럼 조상이 심링크인 설치에서 규칙과 명령이 어긋나 매번 프롬프트가 뜬다.
-- 스크립트 출력의 `permission_rule_effective`가 `false`면(스크립트 경로에 공백이나 `(`·`$`·`;`·`*`·따옴표 같은
-  셸 특수 문자가 있음) 명령이 다른 단어로 쪼개지거나 파싱되지 않아 규칙이 매칭되지 않으니 제안하지 말고 그 이유만 알린다.
-- vault 위치와는 무관하다. vault가 `~/.claude` 아래라 Edit 규칙을 제안하지 않는 경우에도 `<BASH_RULE>`은
+  `{SCRIPTS_DIR}` 문자열 그대로, 무장 때 쓰고 armorer에 Path Variables로 넘기는 것과 같은 문자열로 호출한다. 따로 realpath로
+  바꾸면 `/tmp`처럼 조상이 심링크인 설치에서 규칙과 명령이 어긋나 매번 프롬프트가 뜬다. `<READ_RULES>`의 첫 항목도 같은 `{SCRIPTS_DIR}` 옆의
+  `skills/smartthink/`로 만든다.
+- `bash_rules_effective`가 `false`면(스크립트 경로에 공백이나 `(`·`$`·`;`·`*`·따옴표 같은 셸 특수 문자가 있음) 명령이 다른
+  단어로 쪼개지거나 파싱되지 않아 규칙이 매칭되지 않으니 `<BASH_RULES>`를 제안하지 말고 그 이유만 알린다.
+  `read_rule_effective`가 `false`면(경로에 `[ ] * ? { } ( )`) `<READ_RULES>`도 같은 식으로 뺀다.
+- vault 위치와는 무관하다. vault가 `~/.claude` 아래라 Edit 규칙을 제안하지 않는 경우에도 `<BASH_RULES>`와 `<READ_RULES>`는
   제안한다(스크립트가 여는 파일은 Claude Code 파일 권한 검사 대상이 아니다). 그때 Write 프롬프트는 남는다.
-- **위험을 함께 알린다.** 이 규칙이 있으면 그 경로의 스크립트는 인자와 무관하게 묻지 않고 실행된다. 스크립트는
-  `.../packs/<팩>/pack.md` 하나만, 9개 모듈 원문으로만 고쳐 쓰고 그 밖의 경로·모듈·심링크는 거부하지만,
-  그 파일을 고칠 수 있는 누군가가 있다면 그 사람의 코드가 무프롬프트로 돈다. 플러그인 업데이트로 경로가 바뀌면
-  규칙이 더는 매칭되지 않아 프롬프트가 돌아온다(`/st status`가 NG로 보여준다, init 재실행으로 갱신).
+- **위험을 함께 알린다.** Bash 규칙이 있으면 그 경로의 두 스크립트는 인자와 무관하게 묻지 않고 실행된다. resolver는 vault
+  경로를 출력하고 `--ensure`로 `packs/`와 빈 진화 상태만 만들며, assemble-pack은 `.../packs/<팩>/pack.md` 하나만 9개 모듈
+  원문으로만 고쳐 쓰고 그 밖의 경로·모듈·심링크는 거부한다. 그래도 그 파일을 고칠 수 있는 누군가가 있다면 그 사람의 코드가
+  무프롬프트로 돈다. Read 규칙은 스킬 디렉터리 읽기만 연다. 플러그인 업데이트로 경로가 바뀌면 규칙이 더는 매칭되지 않아
+  프롬프트가 돌아온다(`/st status`가 NG로 보여준다, init 재실행으로 갱신).
 
 묻는 문장(규칙마다 따로 승인받는다. 제안하지 않기로 한 규칙은 줄을 뺀다):
 
 ```
-백그라운드 에이전트가 vault에 팩을 쓸 때 권한 프롬프트가 뜬다. 아래 허용 규칙을 <SETTINGS>에 넣을까?
-  1) <RULE>        팩 파일 Write·Edit
-  2) <BASH_RULE>   팩 5절 원문 조립 스크립트 실행(이 스크립트만, 인자 무관 무프롬프트)
-둘 다 / 1만 / 2만 / 넣지 않음 중에 골라줘.
+무장할 때 vault 쓰기·스킬 파일 읽기·스크립트 실행마다 권한 프롬프트가 뜬다. 아래 허용 규칙을 <SETTINGS>에 넣을까?
+  1) <RULE>             팩 파일 Write·Edit (vault 읽기도 덮는다)
+  2) <READ_RULES>       스킬 레퍼런스 읽기(게이트 비용표, 모듈 원문. install.sh 설치면 링크 경로까지 여러 줄)
+  3) <BASH_RULES>[0]    vault 경로 해석 스크립트 실행(이 스크립트만, 인자 무관 무프롬프트)
+  4) <BASH_RULES>[1]    팩 5절 원문 조립 스크립트 실행(이 스크립트만, 인자 무관 무프롬프트)
+전부 / 번호 골라서 / 넣지 않음 중에 골라줘.
 거절해도 무장은 그대로 동작하고, 매번 승인 프롬프트가 뜰 뿐이야.
 ```
 
@@ -262,6 +280,7 @@ Edit 규칙 대상이 아니라서 이 명령만 따로 묻는다. 규칙 문자
    빈 파일을 만들면 사용자가 나중에 원인을 못 찾는다.
 3. **JSON 파싱이 깨져 있으면 쓰지 말고 보고하라.** 깨진 파일을 고치려 들지 마라.
 4. 쓰기 전 백업을 권장한다: `cp "<SETTINGS>" "<SETTINGS>.bak"` (경로는 resolver 출력값을 그대로 쓴다)
+   이 `cp`는 규칙 묶음 밖이지만 남긴다: init은 사용자가 settings 변경 자체를 승인하는 대화형 1회 절차이고, 대상이 `~/.claude` 아래면 Write 도구로 바꿔도 보호 경로 프롬프트가 뜬다.
 5. **기존 내용을 보존하는 머지여야 한다.** 통째 덮어쓰기 금지. 기존 `permissions.allow` 배열에
    항목 하나를 추가하는 것이고, 다른 키·다른 항목은 한 글자도 건드리지 않는다.
 6. **동등한 규칙**이 이미 있으면 중복 추가하지 말고 "이미 있음"이라고 알린다. 동등한 규칙은
@@ -270,9 +289,10 @@ Edit 규칙 대상이 아니라서 이 명령만 따로 묻는다. 규칙 문자
    (`Edit(~/notes/smartthink)`, `Edit(~/notes/*)`) 하위 팩 파일과 매칭되지 않으므로 동등하지 않다.
    같은 vault를 가리키는 단일 `/` 형식 규칙이 남아 있으면 매칭되지 않는 규칙이라고 알리고, 지울지는
    사용자가 정한다.
-7. `<BASH_RULE>`도 같은 규율(1~5번)로 머지한다. 동등한 규칙은 `<BASH_RULE>` 자체이거나 같은 스크립트 절대경로에
-   끝이 `:*`인 옛 표기(`Bash(python3 <스크립트 절대경로>:*)`)다. 다른 경로의 `assemble-pack.py`를 가리키는 규칙은
-   동등하지 않다(옛 설치 경로일 수 있으니 알리고, 지울지는 사용자가 정한다).
+7. `<BASH_RULES>`·`<READ_RULES>`도 같은 규율(1~5번)로 한 번의 Edit에 머지한다. Bash 규칙의 동등한 규칙은 그 규칙 자체이거나 같은
+   스크립트 절대경로에 끝이 `:*`인 옛 표기(`Bash(python3 <스크립트 절대경로>:*)`)다. 다른 경로의 `resolve-vault.py`·`assemble-pack.py`를
+   가리키는 규칙은 동등하지 않다(옛 설치 경로일 수 있으니 알리고, 지울지는 사용자가 정한다). Read 규칙의 동등한 규칙은 같은
+   스킬 디렉터리나 그 상위 경로를 `Read(~/.../**)`·`Read(//.../**)`로 가리키는 항목이다.
 
 ### 5. 완료 보고
 
@@ -328,7 +348,7 @@ v2 산문 형식이다.**
 3. 변환한다.
    - `{SCRIPTS_DIR}/migrate-evolution.py`가 있으면 **그것을 실행한다.**
      인자 없이 실행하면 dry-run이라 아무것도 쓰지 않는다. 실제 변환은
-     `python3 "{SCRIPTS_DIR}/migrate-evolution.py" {VAULT}/evolution-state.md --write`로만 일어난다.
+     `python3 {SCRIPTS_DIR}/migrate-evolution.py {VAULT}/evolution-state.md --write`로만 일어난다.
      대상 경로를 생략하면 resolver가 고른 vault를 잡는다(다른 vault로 폴백하지 않는다). 변환 대상이 맞는지 dry-run 출력의 `target:` 줄로 먼저 확인한다.
      dry-run의 `backup:` 줄이 백업을 새로 만들지, 기존 것을 유지할지, `--force`가 필요한지 알려준다.
    - 없으면 사용자에게 알리고 인라인 변환(직접 읽어서 v3 스키마로 다시 쓰기)을 제안한다.
@@ -421,8 +441,8 @@ v3 스키마 자체는 `references/analysis-method.md` Step 5의 스키마 절�
 
 **읽기 전용이다. 아무것도 쓰지 않는다.** vault 시드 생성도, `updated` 갱신도, 팩 삭제도 하지 않는다.
 고칠 게 보이면 **무엇을 하면 되는지 안내만** 하고 사용자가 실행하게 한다.
-`{VAULT}`는 resolver를 **`--ensure` 없이** 실행해 얻는다(`python3 "{SCRIPTS_DIR}/resolve-vault.py" --permission-rule`).
-같은 출력의 `permission_rule`·`settings_path`를 4절의 권한 규칙 진단에 쓴다.
+`{VAULT}`는 resolver를 **`--ensure` 없이** 실행해 얻는다(`python3 {SCRIPTS_DIR}/resolve-vault.py --permission-rule`).
+같은 출력의 `permission_rule`·`settings_path`·`bash_rules`·`read_rules`·`vault_writable`을 4절의 환경 진단에 쓴다.
 
 ### 1. 프로필 요약
 
@@ -460,11 +480,12 @@ v2 형식(YAML 헤더 없음)이면 그 사실을 표시하고 "첫 `/st retain`
 | 에이전트 정의 `st-armorer` | 현재 세션 에이전트 목록에 `smartthink:st-armorer` 또는 `st-armorer` | 팩 작성이 general-purpose 폴백으로 내려가 성능이 떨어짐(effort·도구 설정 없이 실행). 인라인 경로일 수도 있음 |
 | 에이전트 정의 `st-thinker` | 현재 세션 에이전트 목록에 `smartthink:st-thinker` 또는 `st-thinker` | `--report`가 general-purpose + `thinker-prompt.md` 폴백으로 내려감 |
 | Agent 도구 사용 가능 | 현재 세션의 도구 목록 | 인라인 경로로 동작한다. 리서치가 메인 컨텍스트를 소모하고 게이트에 비용이 표시됨 |
-| 사용자 레벨 옛 설치 잔재 | `python3 "{SCRIPTS_DIR}/legacy-install.py" detect` 출력이 비어 있음 | 복사 설치된 옛 파일이나 옛 체크아웃을 가리키는 링크가 bare 이름(`/st`, `/smartthink`, `st-thinker`)을 선점해 이 버전 대신 열림 |
+| 사용자 레벨 옛 설치 잔재 | `python3 {SCRIPTS_DIR}/legacy-install.py detect` 출력이 비어 있음 | 복사 설치된 옛 파일이나 옛 체크아웃을 가리키는 링크가 bare 이름(`/st`, `/smartthink`, `st-thinker`)을 선점해 이 버전 대신 열림 |
 | vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고, `pointer`면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`가 가리킨 경로라고, `default`면 `${XDG_DATA_HOME:-~/.local/share}/smartthink`이라고 1줄 표시 |
-| vault 쓰기 가능 | **디렉터리 권한으로 판정**(`test -w {VAULT}`) | 팩·프로필·진화 상태가 기록되지 않음 |
+| vault 쓰기 가능 | **디렉터리 권한으로 판정**: 위 resolver `--permission-rule` 출력의 `vault_writable`(vault가 아직 없으면 가장 가까운 존재 조상 기준). `test -w` 같은 Bash로 따로 재지 마라 | 팩·프로필·진화 상태가 기록되지 않음 |
 | 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`거나 `settings_path`가 `null`이면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: `permission_rule_reason`대로 표시(`home-claude` vault가 `~/.claude` 아래, `protected-folder` 경로에 `.claude`·`.git`·`.vscode`·`.idea` 폴더, `special-characters` 경로에 glob·규칙 문법 문자). 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 그런 폴더·문자가 없는 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소. `settings_path=null`: `CLAUDE_CONFIG_DIR`가 상대경로, 절대경로로 지정하고 init 재실행 |
-| 권한 규칙(Bash 조립) | `python3 {SCRIPTS_DIR}/assemble-pack.py --permission-rule`(`{SCRIPTS_DIR}`는 경로 규약 문자열 그대로)의 `permission_rule`과 같은 항목(또는 init 4절 7번의 동등한 `:*` 표기)이 `settings_path`의 `permissions.allow`에 있으면 OK. 없거나 다른 경로의 `assemble-pack.py`만 가리키면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음·다른 경로: 무장마다 armorer의 5절 조립 Bash에 승인 프롬프트가 뜸(플러그인 업데이트로 경로가 바뀐 경우 포함), `/st init` 재실행으로 설치. `effective=false`: 스크립트 경로에 공백·셸 특수 문자가 있어 규칙이 매칭되지 않음, 그런 문자가 없는 경로에 설치하면 해소 |
+| 권한 규칙(스크립트 Bash) | resolver `--permission-rule` 출력의 `bash_rules` 각 항목(또는 init 4절 7번의 동등한 `:*` 표기)이 `settings_path`의 `permissions.allow`에 있으면 OK. 하나라도 없거나 다른 경로의 스크립트만 가리키면 NG. `bash_rules_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음·다른 경로: 무장마다 메인의 vault 해석 Bash나 armorer의 5절 조립 Bash에 승인 프롬프트가 뜸(플러그인 업데이트로 경로가 바뀐 경우 포함), `/st init` 재실행으로 설치. `effective=false`: 스크립트 경로에 공백·셸 특수 문자가 있어 규칙이 매칭되지 않음, 그런 문자가 없는 경로에 설치하면 해소 |
+| 권한 규칙(스킬 Read) | 같은 출력의 `read_rules` 각 항목(또는 init 4절 7번의 동등한 상위 경로 규칙)이 `permissions.allow`에 있으면 OK. 하나라도 없으면 NG. `read_rule_effective`가 `false`면 NG | 없음: 작업 디렉터리 밖 플러그인이면 무장마다 게이트의 `index.json`과 armorer의 모듈 Read에 승인 프롬프트가 뜸, `/st init` 재실행으로 설치 |
 | `references/index.json` | 파일 존재 | 게이트의 비용 추정이 사전 계산값 대신 실측 근사로 내려감 |
 | 검색 도구 | WebSearch·WebFetch 사용 가능 여부 | 팩 3절(리서치 합성) 생략, `manifest.research=false` |
 | `insane-search` 스킬 | Skill 목록에 존재 | WebFetch만 사용. 차단된 소스는 "차단"으로 표기하고 건너뜀 |

@@ -1084,6 +1084,138 @@ def check_armorer_assembles_with_script() -> Result:
     return ok("definition, fallback and SKILL.md 5b assemble section 5 with assemble-pack.py only", evidence)
 
 
+# Docs whose Bash a session runs while arming or in a subcommand (issue #26).
+SESSION_BASH_DOCS = (SKILL_MD, REFERENCES_DIR / "lifecycle.md", ARMORER_MD, ARMORER_PROMPT_MD)
+# A code line or inline span is taken as a shell command when its first word is one of these.
+SHELL_COMMAND_WORDS = {
+    "awk", "cat", "cd", "cp", "date", "echo", "find", "git", "grep", "head", "ls", "mkdir", "mv",
+    "pip", "printf", "python", "python3", "readlink", "realpath", "rm", "sed", "shasum", "stat",
+    "tail", "tee", "test", "touch", "uv", "wc",
+}
+FENCE_RE = re.compile(r"^[ \t>]*```[ \t]*(?P<lang>[\w-]*)[^\n]*\n(?P<body>.*?)^[ \t>]*```", re.M | re.S)
+INLINE_CODE_RE = re.compile(r"(?<!`)`(?P<code>[^`\n]+)`(?!`)")
+
+
+def _compound_operator(command: str) -> str | None:
+    """The first ; && || or | outside quotes in a shell command line, or None."""
+    quote = ""
+    index = 0
+    while index < len(command):
+        char = command[index]
+        if quote:
+            if char == quote:
+                quote = ""
+        elif char in "'\"":
+            quote = char
+        elif char == ";":
+            return ";"
+        elif command.startswith("&&", index):
+            return "&&"
+        elif command.startswith("||", index):
+            return "||"
+        elif char == "|":
+            return "|"
+        index += 1
+    return None
+
+
+def _shell_commands(text: str) -> list[tuple[int, str]]:
+    """(offset, line) for every fenced code line and inline code span that reads as a command."""
+    found: list[tuple[int, str]] = []
+    fenced: list[tuple[int, int]] = []
+    for block in FENCE_RE.finditer(text):
+        fenced.append(block.span())
+        offset = block.start("body")
+        for line in block.group("body").splitlines(keepends=True):
+            found.append((offset, line.strip()))
+            offset += len(line)
+    for span in INLINE_CODE_RE.finditer(text):
+        if not any(start <= span.start() < end for start, end in fenced):
+            found.append((span.start(), span.group("code").strip()))
+    return [(offset, line) for offset, line in found if line.split(" ", 1)[0] in SHELL_COMMAND_WORDS]
+
+
+def check_session_bash_single_commands() -> Result:
+    """Shell commands shown to a session are single commands, never ; && || or pipe lines."""
+    problems: list[str] = []
+    for path in SESSION_BASH_DOCS:
+        text = read_text(path)
+        if text is None:
+            problems.append(f"{rel(path)} is missing or unreadable")
+            continue
+        for offset, command in _shell_commands(text):
+            operator = _compound_operator(command)
+            if operator:
+                problems.append(
+                    f"{rel(path)}:{line_of(text, offset)} chains commands with '{operator}' "
+                    f"({command[:70]}); allow rules do not match compound lines, run one command per call"
+                )
+    if problems:
+        return bad(f"{len(problems)} compound shell command(s)", problems)
+    return ok("SKILL.md, lifecycle.md and the armorer definition and fallback show single commands only")
+
+
+# The arming commands `st init` installs a rule for (or, for readlink, the one install.sh extra):
+# SKILL.md must not tell the main session to run anything else (final-review of #26 (a)1).
+BUNDLE_COMMAND_RE = re.compile(
+    r"^(?:python3 \{SCRIPTS_DIR\}/(?:resolve-vault\.py|assemble-pack\.py|<)|readlink \{SKILL_DIR\})"
+)
+# A command named on a line that forbids it is a prohibition, not an instruction.
+PROHIBITION_RE = re.compile(r"마라|말고|금지|않는다|하지 않")
+
+
+def check_skill_bash_inside_bundle() -> Result:
+    """SKILL.md shows the main session no Bash beyond the rule bundle, except to forbid it."""
+    text = read_text(SKILL_MD)
+    if text is None:
+        return bad(f"{rel(SKILL_MD)} is missing or unreadable")
+    problems: list[str] = []
+    for offset, command in _shell_commands(text):
+        if len(command.split()) < 2 or BUNDLE_COMMAND_RE.match(command):
+            continue
+        start = text.rfind("\n", 0, offset) + 1
+        end = text.find("\n", offset)
+        if PROHIBITION_RE.search(text[start:end if end >= 0 else None]):
+            continue
+        problems.append(
+            f"{rel(SKILL_MD)}:{line_of(text, offset)} tells the session to run `{command[:60]}`, which no "
+            "init rule covers; use Read/Glob or a resolve-vault.py/assemble-pack.py option instead"
+        )
+    if problems:
+        return bad(f"{len(problems)} Bash instruction(s) outside the rule bundle", problems)
+    return ok("SKILL.md names only resolve-vault.py, assemble-pack.py and the install.sh readlink as Bash")
+
+
+# lifecycle.md (init/retain/status) may also name these, each kept on purpose with its reason in
+# tests/evidence/26-bash-inventory.md. Anything else outside the bundle must be converted or listed.
+LIFECYCLE_EXCEPTION_RE = re.compile(
+    r"^(?:git log\b|cp \"<SETTINGS>\"|python3 \{SCRIPTS_DIR\}/(?:migrate-evolution|legacy-install)\.py\b)"
+)
+
+
+def check_lifecycle_bash_inventory() -> Result:
+    """lifecycle.md names only bundle commands and the recorded exceptions as Bash, except to forbid them."""
+    path = REFERENCES_DIR / "lifecycle.md"
+    text = read_text(path)
+    if text is None:
+        return bad(f"{rel(path)} is missing or unreadable")
+    problems: list[str] = []
+    for offset, command in _shell_commands(text):
+        if len(command.split()) < 2 or BUNDLE_COMMAND_RE.match(command) or LIFECYCLE_EXCEPTION_RE.match(command):
+            continue
+        start = text.rfind("\n", 0, offset) + 1
+        end = text.find("\n", offset)
+        if PROHIBITION_RE.search(text[start:end if end >= 0 else None]):
+            continue
+        problems.append(
+            f"{rel(path)}:{line_of(text, offset)} tells the session to run `{command[:60]}`, which is neither in "
+            "the rule bundle nor a recorded exception; convert it or record it in tests/evidence/26-bash-inventory.md"
+        )
+    if problems:
+        return bad(f"{len(problems)} unlisted Bash instruction(s)", problems)
+    return ok("lifecycle.md names only bundle commands and the recorded init/retain/status exceptions")
+
+
 # The three marker spellings pack section 5 is built from. analysis-method.md is the SSOT;
 # st-armorer.md needs its own copy because the armorer is told to read only Step 0.5 of that
 # file, so a format written down there alone is a format the pack writer never sees.
@@ -1933,6 +2065,9 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("D", "wiring: st-armorer definition and fallback prompt in sync", check_armorer_prompt_sync),
     ("D", "wiring: st-armorer assembles section 5 with assemble-pack.py", check_armorer_assembles_with_script),
     ("D", "wiring: section 5 module marker forms match the SSOT", check_module_marker_forms),
+    ("D", "wiring: session Bash instructions are single commands", check_session_bash_single_commands),
+    ("D", "wiring: SKILL.md arming Bash stays inside the rule bundle", check_skill_bash_inside_bundle),
+    ("D", "wiring: lifecycle.md Bash is the bundle or a recorded exception", check_lifecycle_bash_inventory),
     ("D", "wiring: headless gate signals and branches", check_headless_gate_branch),
     ("E", "schema: evolution-state.md v3 header", check_evolution_state_schema),
     ("E", "schema: profile.md v3 header", check_profile_schema),
