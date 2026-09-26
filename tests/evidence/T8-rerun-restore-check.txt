@@ -1,0 +1,29 @@
+## 제거 전 (2026-09-26 22:56:46 +0900)
+$ test -f "$WT/agents/st-armorer.md" && echo 원본 존재
+원본 존재
+$ shasum -a 256 "$WT/agents/st-armorer.md"
+b80a623f623c238ff40c2b0c7249597d98e13270b33fa50936642ae98a5f4d82  $WT/agents/st-armorer.md
+$ mv "$WT/agents/st-armorer.md" "<scratchpad>/st-armorer.md.gates"
+$ ls "$WT/agents/"
+st-thinker.md
+
+## 복원 (2026-09-26 23:12:19 +0900, T8 세션 턴 종료 후)
+$ mv "<scratchpad>/st-armorer.md.gates" "$WT/agents/st-armorer.md"
+$ ls "$WT/agents/"
+st-armorer.md
+st-thinker.md
+$ shasum -a 256 "$WT/agents/st-armorer.md"
+b80a623f623c238ff40c2b0c7249597d98e13270b33fa50936642ae98a5f4d82  $WT/agents/st-armorer.md
+$ git status --short -- agents/
+(빈 출력 = HEAD와 동일)
+
+## 팩 구조 검사 (복원 후)
+$ python3 scripts/check-structure.py --pack "<VAULT>/packs/2026-09-26-local-museum-signage/"; echo exit=$?
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+38 passed, 0 failed, 0 skipped
+pack: 5 passed, 0 failed, 0 skipped
+exit=0

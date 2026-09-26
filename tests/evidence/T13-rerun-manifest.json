@@ -1,0 +1,13 @@
+{
+  "task": "지역 보행자 안전 안내를 개선해줘",
+  "interpretation": "주제만 입력, 지역 미지정(한국 전반 기준). 예상 작업 A 안내 메시지 재설계 / B 위험 지점 중심 개입 설계 / C 경고 피로 감소와 효과 측정 운영 체계.",
+  "cynefin": "Complicated",
+  "classification": "문제 해결",
+  "modules": ["핵심 엔진", "인지 무기고", "TRIZ 혁신 시스템", "패턴 합성", "메타인지"],
+  "budget": null,
+  "research": true,
+  "profile_version": null,
+  "est_tokens": { "pack": 149792, "agent": 141000 },
+  "created": "2026-09-26T23:07:51+09:00",
+  "harness": "codex"
+}
