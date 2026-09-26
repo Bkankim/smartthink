@@ -174,7 +174,8 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 
   ```
   vault가 ~/.claude 아래라서 Claude Code가 팩 쓰기마다 확인을 받는다(허용 규칙으로 못 없앰).
-  프롬프트를 없애려면 2절에서 vault를 ~/.claude 밖으로 옮기면 된다. 그대로 둬도 무장은 동작한다.
+  프롬프트를 없애려면 /st init을 다시 실행해 2절에서 ~/.claude 밖 경로를 고르거나,
+  SMARTTHINK_VAULT로 ~/.claude 밖 경로를 지정하면 된다. 그대로 둬도 무장은 동작한다.
   세션 중에는 프롬프트의 "allow Claude to edit files in its ~/.claude folder for this session"로 넘길 수 있다.
   ```
 
@@ -198,8 +199,12 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 4. 쓰기 전 백업을 권장한다: `cp "<SETTINGS>" "<SETTINGS>.bak"` (경로는 resolver 출력값을 그대로 쓴다)
 5. **기존 내용을 보존하는 머지여야 한다.** 통째 덮어쓰기 금지. 기존 `permissions.allow` 배열에
    항목 하나를 추가하는 것이고, 다른 키·다른 항목은 한 글자도 건드리지 않는다.
-6. 같은 규칙이 이미 있으면 중복 추가하지 말고 "이미 있음"이라고 알린다. 같은 vault를 가리키는
-   단일 `/` 형식 규칙이 남아 있으면 매칭되지 않는 규칙이라고 알리고, 지울지는 사용자가 정한다.
+6. **동등한 규칙**이 이미 있으면 중복 추가하지 말고 "이미 있음"이라고 알린다. 동등한 규칙은
+   `<RULE>` 자체이거나, 같은 vault 또는 그 상위 경로를 `Edit(~/.../**)` 또는 `Edit(//.../**)`로
+   가리키는 항목이다(문자열이 달라도 가리키는 경로로 판정). 끝이 `/**` 재귀 glob이 아니면
+   (`Edit(~/notes/smartthink)`, `Edit(~/notes/*)`) 하위 팩 파일과 매칭되지 않으므로 동등하지 않다.
+   같은 vault를 가리키는 단일 `/` 형식 규칙이 남아 있으면 매칭되지 않는 규칙이라고 알리고, 지울지는
+   사용자가 정한다.
 
 ### 5. 완료 보고
 
@@ -390,7 +395,7 @@ v2 형식(YAML 헤더 없음)이면 그 사실을 표시하고 "첫 `/st retain`
 | 사용자 레벨 옛 설치 잔재 | `python3 "{SCRIPTS_DIR}/legacy-install.py" detect` 출력이 비어 있음 | 복사 설치된 옛 파일이나 옛 체크아웃을 가리키는 링크가 bare 이름(`/st`, `/smartthink`, `st-thinker`)을 선점해 이 버전 대신 열림 |
 | vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고 1줄 표시 |
 | vault 쓰기 가능 | **디렉터리 권한으로 판정**(`test -w {VAULT}`) | 팩·프로필·진화 상태가 기록되지 않음 |
-| 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 `permission_rule`과 같은 항목(`Edit(~/...)` 또는 `Edit(//...)`)이 있으면 OK. 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: vault가 `~/.claude` 아래라 규칙으로 프롬프트를 못 없앰, init 2절에서 vault를 옮기면 해소 |
+| 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: vault가 `~/.claude` 아래라 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 ~/.claude 밖 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소 |
 | `references/index.json` | 파일 존재 | 게이트의 비용 추정이 사전 계산값 대신 실측 근사로 내려감 |
 | 검색 도구 | WebSearch·WebFetch 사용 가능 여부 | 팩 3절(리서치 합성) 생략, `manifest.research=false` |
 | `insane-search` 스킬 | Skill 목록에 존재 | WebFetch만 사용. 차단된 소스는 "차단"으로 표기하고 건너뜀 |

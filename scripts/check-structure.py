@@ -1173,24 +1173,42 @@ PERMISSION_RULE_LEFTOVERS = (
     (r"Edit\(/(?!/)", "single-/ rule path is relative to the settings file"),
     (r"~/\.claude/settings\.json", "hardcoded settings file ignores CLAUDE_CONFIG_DIR"),
 )
-# A line that names the single-/ form only to forbid it or flag it as NG is allowed.
-PERMISSION_RULE_WARNINGS = ("쓰지 마라", "NG", "매칭 안 됨")
+# A line may show the single-/ form only as the literal placeholder, and only to forbid it or flag
+# it as NG. Warnings are whole words so "NG" inside <SETTINGS> or WARNING does not count.
+PERMISSION_RULE_WARNINGS = re.compile(r"쓰지 마라|매칭 안 됨|\bNG\b")
+SINGLE_SLASH_EXAMPLE = "Edit(/<절대경로>/**)"
 
 
 def check_permission_rule_format() -> Result:
     """init/status and every doc that describes the rule must name only ~/ or // rules in the resolved settings."""
     problems: list[str] = []
     for path in (REFERENCES_DIR / "lifecycle.md", SKILL_MD, DATA_DIR / "README.md", ANALYSIS_METHOD_MD):
-        for number, line in enumerate((read_text(path) or "").splitlines(), start=1):
+        text = read_text(path)
+        if text is None:
+            problems.append(f"{rel(path)}: missing or unreadable, so its rule wording cannot be checked")
+            continue
+        for number, line in enumerate(text.splitlines(), start=1):
             for pattern, reason in PERMISSION_RULE_LEFTOVERS:
                 if not re.search(pattern, line):
                     continue
-                if pattern.startswith(r"Edit\(/") and any(word in line for word in PERMISSION_RULE_WARNINGS):
+                if (
+                    pattern.startswith(r"Edit\(/")
+                    and PERMISSION_RULE_WARNINGS.search(line)
+                    and not re.search(pattern, line.replace(SINGLE_SLASH_EXAMPLE, ""))
+                ):
                     continue
                 problems.append(f"{rel(path)}:{number}: {reason}: {line.strip()}")
+    # The init step that installs the rule must itself take it from the resolver; a mention in
+    # the status section alone does not count.
     lifecycle = read_text(REFERENCES_DIR / "lifecycle.md") or ""
-    if "--permission-rule" not in lifecycle:
-        problems.append(f"{rel(REFERENCES_DIR / 'lifecycle.md')}: does not take the rule from resolve-vault.py --permission-rule")
+    start = lifecycle.find("### 4. 권한 규칙 제안")
+    end = lifecycle.find("\n### ", start + 1) if start >= 0 else -1
+    init_step = lifecycle[start:end if end >= 0 else None] if start >= 0 else ""
+    if "--permission-rule" not in init_step:
+        problems.append(
+            f"{rel(REFERENCES_DIR / 'lifecycle.md')}: init step '### 4. 권한 규칙 제안' does not take the rule "
+            "from resolve-vault.py --permission-rule"
+        )
     if problems:
         return bad(f"{len(problems)} permission rule leftover(s)", problems)
     return ok("lifecycle.md takes the vault rule and settings path from resolve-vault.py --permission-rule")
