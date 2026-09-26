@@ -1,0 +1,13 @@
+{
+  "task": "동네 도서관의 청소년 이용률을 높이는 방안",
+  "interpretation": "주제만 입력, A/B/C 미지정으로 셋 다 유지. A: 이용 저조 원인 진단과 최대 레버리지 개입점 / B: 공간·프로그램·운영·홍보 개선안 포트폴리오와 소규모 파일럿·측정지표 / C: 예산·인력 제약을 반영한 구청·운영위원회 제출용 제안서",
+  "cynefin": "Complex",
+  "classification": "전략 수립",
+  "modules": ["핵심 엔진 (#1 제1원리 분해, #11 역전 사고, #4 시장 창조)", "인지 무기고", "패턴 합성", "현실 왜곡", "실행 속도"],
+  "budget": null,
+  "research": true,
+  "profile_version": null,
+  "est_tokens": { "pack": 137246, "agent": 165120 },
+  "created": "2026-09-27T01:00:17+09:00",
+  "harness": "claude-code"
+}
