@@ -1,0 +1,13 @@
+{
+  "task": "지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘",
+  "interpretation": "주제만 입력됨. 예상 작업 A: 현행 예약(도서·좌석·시설·프로그램) 진단과 3~5년 로드맵 / B: 노쇼·독점 예약과 공정성·이용률 긴장을 푸는 정책·시스템 설계 / C: 예산·인력 제약 속 투자 우선순위와 시 통합 플랫폼·국가 서비스 연계 판단.",
+  "cynefin": "Complicated/Complex",
+  "classification": "전략 수립",
+  "modules": ["core-engines.md (#1 제1원리 분해, #11 역전 사고, #9 복합 우위 적층)", "cognitive-arsenal.md", "anti-fragile-strategy.md"],
+  "budget": 120000,
+  "research": true,
+  "profile_version": null,
+  "est_tokens": { "pack": 109540, "agent": 105000 },
+  "created": "2026-09-26T23:39:25+09:00",
+  "harness": "claude-code"
+}

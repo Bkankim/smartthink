@@ -1,0 +1,72 @@
+# I9 재현 R4 (수정 전 코드, 워크트리 main 65272b5와 동일 SKILL.md)
+
+- 설정: 격리 CLAUDE_CONFIG_DIR(사용자 레벨 스킬·명령·CLAUDE.md·훅 없음). settings.json 원문(경로 치환):
+```json
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Glob", "Grep", "Write($TMPDIR//st-R4-vault.sZUQ/**)", "Edit($TMPDIR//st-R4-vault.sZUQ/**)", "WebSearch", "WebFetch", "Agent", "Skill"],
+    "deny": ["Read(~/.claude/smartthink-vault/**)", "Write(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]
+  }
+}
+```
+- 판정: **게이트에서 턴 종료**. 마지막 줄이 '진행할까요?'(R3) / 조작 안내 뒤 종료(R4). 팩 없음(vault에 evolution-state.md만).
+- 헤드리스 판별 근거: 없음. 게이트 머리줄이 대화형 원형 '━━ SmartThink 무장 게이트 ━━'이고 헤드리스 언급 0회. 대화형으로 기본값을 잡음.
+
+## 로딩된 SKILL.md 경로 (트랜스크립트 Base directory 줄)
+Base directory for this skill: ~/workspace/smartthink-fix-9-headless-gate/skills/smartthink
+
+## 메인 턴 흐름 (트랜스크립트 발췌, 서브에이전트 제외)
+USER: /st --budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘
+TOOL_USE: Skill {"skill": "smartthink:st", "args": "--budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘"}
+TOOL_USE: Skill {"skill": "smartthink:smartthink", "args": "--budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘"}
+TOOL_USE: Bash {"command": "python3 \"~/workspace/smartthink-fix-9-headless-gate/scripts/resolve-vault.py\" --ensure", "description": "Resolve SmartThink vault path"}
+TOOL_USE: Read {"file_path": "~/workspace/smartthink-fix-9-headless-gate/skills/smartthink/references/index.json"}
+TOOL_USE: Bash {"command": "ls -la $TMPDIR/st-R4-vault.sZUQ $TMPDIR/st-R4-vault.sZUQ/packs; cat $TMPDIR/...
+ASSISTANT_TEXT: ━━ SmartThink 무장 게이트 ━━  **1. 입력 해석** 공공 도서관 이용자가 예약(홀드) 대기 상태를 확인하는 안내 화면(웹·앱·키오스크)을 개선하는 **실행 계획**을 설계하는 작업입니다. 현황 진단, 개선안 도출, 우선순위, 단계별 로드맵, 성과 측정 기준까지 다룹니다. (대상 채널이 키오스크나 모바일 등 한쪽에 한정된다면 알려주세요. 지금은 전체 채널 기준으로 해석했습니다.)  **2. 진단** Cynefin
+
+## 표준 출력·표준 오류 원문 (claude -p, 마지막 메시지만 출력됨)
+# run=R4 mode=iso start=2026-09-26 22:57:53 vault=$TMPDIR/st-R4-vault.sZUQ cwd=$TMPDIR/st-R4-cwd.39ks cfg=$TMPDIR/st-R4-cfg.xc59
+# prompt: /st --budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘
+Permission allow rule ($TMPDIR/st-R4-cfg.xc59/settings.json): Write($TMPDIR/st-R4-vault.sZUQ/**) is not matched by file permission checks — only Edit(path) rules are. Use Edit($TMPDIR/st-R4-vault.sZUQ/**) instead (Edit rules cover all file-editing tools).
+Permission deny rule ($TMPDIR/st-R4-cfg.xc59/settings.json): Write(~/.claude/smartthink-vault/**) is not matched by file permission checks — only Edit(path) rules are. Use Edit(~/.claude/smartthink-vault/**) instead (Edit rules cover all file-editing tools).
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+━━ SmartThink 무장 게이트 ━━
+
+**1. 입력 해석**
+공공 도서관 이용자가 예약(홀드) 대기 상태를 확인하는 안내 화면(웹·앱·키오스크)을 개선하는 **실행 계획**을 설계하는 작업입니다. 현황 진단, 개선안 도출, 우선순위, 단계별 로드맵, 성과 측정 기준까지 다룹니다.
+(대상 채널이 키오스크나 모바일 등 한쪽에 한정된다면 알려주세요. 지금은 전체 채널 기준으로 해석했습니다.)
+
+**2. 진단**
+Cynefin: **Complicated** (분석하면 답이 나오는 기존 서비스의 개선 문제)  |  분류: **문제 해결**
+※ 대기 예상일의 정확도와 확실성, 정보 밀도와 단순함 같은 트레이드오프가 있어 "체계적 발명"과 경계에 있습니다. TRIZ를 원하시면 말씀해 주세요.
+
+**3. 추천 모듈 (5개, ★ = 주력)**
+- ★ **핵심 엔진** (제1원리 분해 · 역전 사고 · 복합 우위 적층): 이용자가 대기 화면에서 알고 싶은 것을 "몇 번째인지, 언제인지, 무엇을 할 수 있는지"로 분해합니다. 역전 사고로 문의와 불만을 만드는 화면 요소를 찾습니다.
+- ★ **실행 속도**: OODA와 되돌릴 수 있는 결정 기준으로 빠른 개선(문구·표시 순서)과 시스템 연동 과제(ILS 데이터, 예상일 산출)를 나눠 단계별 로드맵을 짭니다.
+- ★ **인지 무기고**: 대기 심리(불확실한 기다림은 더 길게 느껴짐), 앵커링, 대기행렬 이론으로 예상일을 어떻게 보여줄지 설계합니다.
+- **TRIZ 혁신 시스템**: "정확한 예상일을 보여주되 틀려도 신뢰를 잃지 않는다"는 모순을 분리 원리로 풉니다.
+- **메타인지**: 역전 사고와 Wardley 지형으로 도서관이 직접 만들 부분과 벤더 ILS에 맡길 부분을 가릅니다.
+
+**4. 예상 비용 (추정치)**
+- 5개 모듈을 모두 싣는 경우: 팩 ≈ 139K로 예산 60K를 넘습니다.
+- **절삭:** 메타인지(-24.7K), TRIZ(-22.0K), ★3순위 인지 무기고(-43.1K)를 빼서 **팩 ≈ 48K**로 맞췄습니다. 리서치는 ON으로 유지했습니다(팩 3절이 유일한 외부 근거라서).
+- **복원:** 없습니다(절삭은 1패스로 끝나고 되돌리지 않습니다).
+- **최종 모듈: ★ 핵심 엔진 + ★ 실행 속도**
+- 메인에 실릴 팩 ≈ 48K 토큰, 서브에이전트 작업 ≈ 62K 토큰
+- ※ 두 값 모두 추정치이며 실제와 다를 수 있습니다.
+
+**5. 리서치: ON (기본)**
+도서관 예약 대기 UX 사례, ILS(Koha·Alma·KOLAS 등)의 대기 정보 표시 방식, 대기 심리 연구를 조사합니다.
+
+**6. 조작**
+- `Enter`: 위 구성(핵심 엔진 + 실행 속도, 리서치 ON)으로 진행
+- 숫자: 예산 상한 변경 (예: `100000`을 입력하면 인지 무기고를 되살릴 수 있음)
+- 모듈 ±: 추가·제거 (예: "실행 속도 빼고 인지 무기고 넣어". 이 경우 팩 ≈ 79K로 예산 초과)
+- `--nosearch`: 리서치 끄기
+
+---
+※ 아직 vault에 프로필이 없습니다. 무장이 끝나면 `/st init`을 안내해 드리겠습니다.
+# exit=0 end=2026-09-26 22:58:37
+# packs:
+$TMPDIR/st-R4-vault.sZUQ/evolution-state.md
+- R4 호출 경로: 격리 설정에 사용자 레벨 st.md가 없어 bare '/st'가 플러그인 명령 'smartthink:st'로 해석됨(TOOL_USE Skill smartthink:st → smartthink:smartthink).

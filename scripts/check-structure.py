@@ -1166,6 +1166,34 @@ def check_vault_resolver_wiring() -> Result:
     return ok("SKILL.md, lifecycle.md and both installers resolve {VAULT} through resolve-vault.py")
 
 
+# Issue #9: without a stated signal the model defaults to interactive and ends the
+# headless turn at the gate. The signals must be tool-free (Bash env reads can be denied).
+HEADLESS_SIGNALS = ("### 헤드리스 판별", "Claude Agent SDK", "AskUserQuestion")
+# Each section must carry the branch itself; a bare mention of 헤드리스 or a link is not enough.
+HEADLESS_SECTION_RULES = {
+    "## 4단계: 게이트 HITL-1": ("헤드리스면 묻지 않는다", "같은 턴에서", "게이트에서 턴을 끝내"),
+    "### `--budget N`": ("헤드리스면 묻지 않는다", "같은 턴에서"),
+}
+
+
+def check_headless_gate_branch() -> Result:
+    """SKILL.md names tool-free headless signals and branches inside the gate and --budget."""
+    text = read_text(SKILL_MD)
+    if text is None:
+        return bad(f"{rel(SKILL_MD)} is missing or unreadable")
+    problems = [f"{rel(SKILL_MD)}: headless signal text missing: {s!r}" for s in HEADLESS_SIGNALS if s not in text]
+    for heading, phrases in HEADLESS_SECTION_RULES.items():
+        start = text.find(heading)
+        end = text.find("\n#", start + len(heading)) if start >= 0 else -1
+        body = text[start:end if end >= 0 else len(text)] if start >= 0 else ""
+        for phrase in phrases:
+            if phrase not in body:
+                problems.append(f"{rel(SKILL_MD)}: {heading!r} body lacks headless rule text {phrase!r}")
+    if problems:
+        return bad(f"{len(problems)} headless gate wiring problem(s)", problems)
+    return ok("SKILL.md states tool-free headless signals and a headless branch in the gate and --budget")
+
+
 # ----------------------------------------------------------------- F. v2 leftovers
 
 
@@ -1656,6 +1684,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("D", "wiring: st-thinker definition and fallback prompt in sync", check_thinker_prompt_sync),
     ("D", "wiring: thinker-prompt substitution variables", check_thinker_prompt_variables),
     ("D", "wiring: section 5 module marker forms match the SSOT", check_module_marker_forms),
+    ("D", "wiring: headless gate signals and branches", check_headless_gate_branch),
     ("E", "schema: evolution-state.md v3 header", check_evolution_state_schema),
     ("E", "schema: profile.md v3 header", check_profile_schema),
     ("E", "schema: profile.md six blocks in order", check_profile_blocks),

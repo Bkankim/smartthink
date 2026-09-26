@@ -1,0 +1,29 @@
+# T12 재실측 direct-real (2026-09-26, 수정 후 SKILL.md, Claude Code 2.1.283, --model opus, 비대화식 지시 문구 없음)
+- 호출 경로: /smartthink:smartthink  |  입력: T12 원문(--budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘)
+- 설정: 실제 설정 디렉터리(~/.claude, defaultMode auto). 중첩 실행이라 CLAUDE_CODE_OAUTH_TOKEN을 자식 env에만 주입([REDACTED]). CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, SMARTTHINK_VAULT=새 임시 디렉터리, cwd=임시 디렉터리
+- 로딩된 SKILL.md (트랜스크립트): Base directory for this skill: ~/workspace/smartthink-fix-9-headless-gate/skills/smartthink
+- Skill 호출 순서: (슬래시 명령이 스킬을 직접 로딩)
+- 메인 도구·텍스트 순서: Bash Bash Agent TEXT Bash TEXT TEXT
+- 트랜스크립트 게이트 머리줄: 없음(6항목 게이트 블록 미출력, 판정은 요약 줄로)
+- manifest: budget 120000 | research True | modules ['핵심 엔진', '인지 무기고', '안티프래질 전략'] | est_tokens {'pack': 108365, 'agent': 127273}
+
+## python3 scripts/check-structure.py --pack <팩 사본 디렉터리>
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+pack: 5 passed, 0 failed, 0 skipped
+exit=0
+
+## 표준 출력·표준 오류 원문
+# run=B-direct-real mode=real start=2026-09-26 23:33:08 vault=$TMPDIR/st-B-direct-real-vault.Uhqu cwd=$TMPDIR/st-B-direct-real-cwd.s0pJ cfg=real
+# prompt: /smartthink:smartthink --budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘
+무장 팩을 만들었고, 팩의 1절 브리핑은 바로 앞 응답에 출력해 두었습니다. 이제 작업을 지시하세요. 깊은 작업이라면 먼저 `/effort xhigh`를 실행하는 것을 권장합니다.
+
+헤드리스: 자동 진행 | 상한 120K | 절삭: 실행 속도·메타인지 제외 | 복원: 없음 | 팩: $TMPDIR/st-B-direct-real-vault.Uhqu/packs/2026-09-26-library-reservation-longterm-strategy/
+# exit=0 end=2026-09-26 23:41:16
+# packs:
+$TMPDIR/st-B-direct-real-vault.Uhqu/evolution-state.md
+$TMPDIR/st-B-direct-real-vault.Uhqu/packs/2026-09-26-library-reservation-longterm-strategy/pack.md
+$TMPDIR/st-B-direct-real-vault.Uhqu/packs/2026-09-26-library-reservation-longterm-strategy/manifest.json

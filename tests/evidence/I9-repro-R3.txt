@@ -1,0 +1,73 @@
+# I9 재현 R3 (수정 전 코드, 워크트리 main 65272b5와 동일 SKILL.md)
+
+- 설정: 격리 CLAUDE_CONFIG_DIR(사용자 레벨 스킬·명령·CLAUDE.md·훅 없음). settings.json 원문(경로 치환):
+```json
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Glob", "Grep", "Write($TMPDIR//st-R3-vault.DnBB/**)", "Edit($TMPDIR//st-R3-vault.DnBB/**)", "WebSearch", "WebFetch", "Agent", "Skill"],
+    "deny": ["Read(~/.claude/smartthink-vault/**)", "Write(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]
+  }
+}
+```
+- 판정: **게이트에서 턴 종료**. 마지막 줄이 '진행할까요?'(R3) / 조작 안내 뒤 종료(R4). 팩 없음(vault에 evolution-state.md만).
+- 헤드리스 판별 근거: 없음. 게이트 머리줄이 대화형 원형 '━━ SmartThink 무장 게이트 ━━'이고 헤드리스 언급 0회. 대화형으로 기본값을 잡음.
+
+## 로딩된 SKILL.md 경로 (트랜스크립트 Base directory 줄)
+Base directory for this skill: ~/workspace/smartthink-fix-9-headless-gate/skills/smartthink
+
+## 메인 턴 흐름 (트랜스크립트 발췌, 서브에이전트 제외)
+USER: <command-message>smartthink:smartthink</command-message> <command-name>/smartthink:smartthink</command-name> <command-args>--budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘</command-args>
+TOOL_USE: Bash {"command": "python3 \"~/workspace/smartthink-fix-9-headless-gate/scripts/resolve-vault.py\" --ensure", "description": "Resolve SmartThink vault path"}
+TOOL_USE: Read {"file_path": "~/workspace/smartthink-fix-9-headless-gate/skills/smartthink/references/index.json"}
+TOOL_USE: Bash {"command": "ls -la $TMPDIR/st-R3-vault.DnBB $TMPDIR/st-R3-vault.DnBB/packs; cat $TMPDIR/...
+ASSISTANT_TEXT: ━━ SmartThink 무장 게이트 ━━  **1. 입력 해석** 공공 도서관에서 예약 도서를 기다리는 이용자에게 보여주는 대기열 안내 화면(순번, 예상 대기 기간, 상태 변화 알림 등)을 개선하려고 합니다. 문제 진단부터 개선안 설계, 단계별 실행·검증까지 이어지는 **실행 계획**이 필요합니다. (대상이 웹/앱 화면인지 관내 키오스크인지 정해지지 않았습니다. 지정하지 않으면 셋 다 포함해 진행합니다.)  **2. 진단**
+
+## 표준 출력·표준 오류 원문 (claude -p, 마지막 메시지만 출력됨)
+# run=R3 mode=iso start=2026-09-26 22:57:53 vault=$TMPDIR/st-R3-vault.DnBB cwd=$TMPDIR/st-R3-cwd.vOZN cfg=$TMPDIR/st-R3-cfg.afXi
+# prompt: /smartthink:smartthink --budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘
+Permission allow rule ($TMPDIR/st-R3-cfg.afXi/settings.json): Write($TMPDIR/st-R3-vault.DnBB/**) is not matched by file permission checks — only Edit(path) rules are. Use Edit($TMPDIR/st-R3-vault.DnBB/**) instead (Edit rules cover all file-editing tools).
+Permission deny rule ($TMPDIR/st-R3-cfg.afXi/settings.json): Write(~/.claude/smartthink-vault/**) is not matched by file permission checks — only Edit(path) rules are. Use Edit(~/.claude/smartthink-vault/**) instead (Edit rules cover all file-editing tools).
+Warning: no stdin data received in 3s, proceeding without it. If piping from a slow command, redirect stdin explicitly: < /dev/null to skip, or wait longer.
+━━ SmartThink 무장 게이트 ━━
+
+**1. 입력 해석**
+공공 도서관에서 예약 도서를 기다리는 이용자에게 보여주는 대기열 안내 화면(순번, 예상 대기 기간, 상태 변화 알림 등)을 개선하려고 합니다. 문제 진단부터 개선안 설계, 단계별 실행·검증까지 이어지는 **실행 계획**이 필요합니다.
+(대상이 웹/앱 화면인지 관내 키오스크인지 정해지지 않았습니다. 지정하지 않으면 셋 다 포함해 진행합니다.)
+
+**2. 진단**
+Cynefin: **Complicated/Complex 경계**, Complicated 쪽으로 봅니다. 화면 정보 구조는 분석하면 답이 나옵니다. 다만 대기 시간 예측의 불확실성과 이용자 불안이라는 창발적 요소가 섞여 있습니다.
+분류: **문제 해결** (이용자가 핵심이지만 시장 문제는 아님 → 기술적 모순이 핵심은 아님 → 선택지 비교가 아님)
+
+**3. 추천 모듈 (5개, ★ = 주력, 순위순)**
+★ 핵심 엔진 (제1원리 분해 · 역전 사고 · 반직관 검증): 이용자가 "몇 번째인지"보다 "언제 받을 수 있는지"와 "내가 할 일이 있는지"를 알고 싶어 하는지 검증하고, 불안과 문의를 늘리는 화면 요소를 거꾸로 추적합니다.
+★ 실행 속도: 요청이 "실행 계획"이므로 OODA 기반의 작은 반복 출시, 되돌릴 수 있는 결정과 되돌릴 수 없는 결정의 구분, 파일럿 지점 선정에 씁니다.
+★ 인지 무기고: 대기 심리(불확실한 대기는 더 길게 느껴짐), 앵커링, 손실 회피, 큐잉 이론(리틀의 법칙)으로 예상 대기 표시 방식을 설계합니다.
+  TRIZ: "정확한 예측 vs 약속 불이행 리스크", "정보량 vs 가독성" 같은 모순을 분리 원리로 풉니다.
+  메타인지: Cynefin 재진단으로 계획이 과잉 분석에 빠지지 않는지 점검합니다.
+
+**4. 예상 비용 (추정치)**
+메인에 실릴 팩 ≈ 48K 토큰
+서브에이전트 작업 ≈ 62K 토큰
+※ 두 값 모두 추정이며 실제와 다를 수 있습니다.
+
+`--budget 60000`을 적용했습니다. 5개 모듈 전부 싣는 원안은 ≈139K입니다.
+절삭: 메타인지·TRIZ 제외(-47K) → 92K. 여전히 상한을 넘어 ★ 최하위인 인지 무기고도 제외(-43K) → **48K**. 리서치 ON은 유지합니다(3절이 유일한 외부 근거이고 3K로 가장 쌈).
+복원: 없음(절삭은 1패스, 되돌리지 않음)
+→ **최종 모듈: 핵심 엔진 + 실행 속도**
+
+**5. 리서치: ON (기본)**
+검색 대상은 도서관 예약·홀드 대기열 UX 사례, 대기 심리 연구, 도서관 시스템(ILS)의 예상 대기 산출 방식입니다. armorer 서브에이전트가 수행하므로 검색 원문은 메인 컨텍스트에 실리지 않습니다.
+※ `insane-search`가 없어 WebFetch만 씁니다. 차단된 소스는 "차단"으로 표기하고 건너뜁니다.
+
+**6. 조작**
+- Enter: 위 구성(핵심 엔진 + 실행 속도, 리서치 ON, ≈48K)으로 진행
+- 숫자: 예산 상한 재지정 (예: `100000`을 주면 인지 무기고가 들어가 ≈91K)
+- 모듈 ±: 추가·제거 (예: "실행 속도 빼고 인지 무기고 넣어"로 대기 심리 중심 구성, ≈79K이며 상한 조정 필요)
+- `--nosearch`: 리서치 끄기
+
+참고: vault(`…/st-R3-vault.DnBB`)에 프로필이 없고 진화 상태도 비어 있어서 가중치 없이 추천했습니다.
+
+진행할까요?
+# exit=0 end=2026-09-26 22:58:33
+# packs:
+$TMPDIR/st-R3-vault.DnBB/evolution-state.md
