@@ -1186,6 +1186,36 @@ def check_skill_bash_inside_bundle() -> Result:
     return ok("SKILL.md names only resolve-vault.py, assemble-pack.py and the install.sh readlink as Bash")
 
 
+# lifecycle.md (init/retain/status) may also name these, each kept on purpose with its reason in
+# tests/evidence/26-bash-inventory.md. Anything else outside the bundle must be converted or listed.
+LIFECYCLE_EXCEPTION_RE = re.compile(
+    r"^(?:git log\b|cp \"<SETTINGS>\"|python3 \{SCRIPTS_DIR\}/(?:migrate-evolution|legacy-install)\.py\b)"
+)
+
+
+def check_lifecycle_bash_inventory() -> Result:
+    """lifecycle.md names only bundle commands and the recorded exceptions as Bash, except to forbid them."""
+    path = REFERENCES_DIR / "lifecycle.md"
+    text = read_text(path)
+    if text is None:
+        return bad(f"{rel(path)} is missing or unreadable")
+    problems: list[str] = []
+    for offset, command in _shell_commands(text):
+        if len(command.split()) < 2 or BUNDLE_COMMAND_RE.match(command) or LIFECYCLE_EXCEPTION_RE.match(command):
+            continue
+        start = text.rfind("\n", 0, offset) + 1
+        end = text.find("\n", offset)
+        if PROHIBITION_RE.search(text[start:end if end >= 0 else None]):
+            continue
+        problems.append(
+            f"{rel(path)}:{line_of(text, offset)} tells the session to run `{command[:60]}`, which is neither in "
+            "the rule bundle nor a recorded exception; convert it or record it in tests/evidence/26-bash-inventory.md"
+        )
+    if problems:
+        return bad(f"{len(problems)} unlisted Bash instruction(s)", problems)
+    return ok("lifecycle.md names only bundle commands and the recorded init/retain/status exceptions")
+
+
 # The three marker spellings pack section 5 is built from. analysis-method.md is the SSOT;
 # st-armorer.md needs its own copy because the armorer is told to read only Step 0.5 of that
 # file, so a format written down there alone is a format the pack writer never sees.
@@ -2037,6 +2067,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("D", "wiring: section 5 module marker forms match the SSOT", check_module_marker_forms),
     ("D", "wiring: session Bash instructions are single commands", check_session_bash_single_commands),
     ("D", "wiring: SKILL.md arming Bash stays inside the rule bundle", check_skill_bash_inside_bundle),
+    ("D", "wiring: lifecycle.md Bash is the bundle or a recorded exception", check_lifecycle_bash_inventory),
     ("D", "wiring: headless gate signals and branches", check_headless_gate_branch),
     ("E", "schema: evolution-state.md v3 header", check_evolution_state_schema),
     ("E", "schema: profile.md v3 header", check_profile_schema),

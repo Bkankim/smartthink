@@ -27,6 +27,8 @@ assemble-pack.py, taken from the path this script was invoked by, symlinks not r
 "bash_rules_effective", and "read_rule" for the sibling skills/smartthink/ directory the session and
 the armorer Read, with "read_rule_effective"; "read_rules" adds the user-level skills/smartthink
 symlinks (install.sh) that resolve to that directory, since the session Reads through the link.
+"vault_writable" says whether the vault, or the nearest existing folder on its path, is a writable
+directory (what `st status` reports).
 --module-sizes NAME... prints {"modules": {name: {"bytes", "est_tokens"}}} for files in the sibling
 skills/smartthink/references/, the gate's fallback when index.json is missing.
 --ensure also creates packs/ and copies the evolution-state template when absent. profile.md is
@@ -209,6 +211,17 @@ def module_sizes(names: list[str]) -> dict:
         size = (references / name).stat().st_size
         modules[name] = {"bytes": size, "est_tokens": round(size / TOKEN_DIVISOR)}
     return {"modules": modules}
+
+
+def vault_writable(vault: Path) -> bool:
+    # `st status` used Bash `test -w {VAULT}`, a command outside the rule bundle (final-review of
+    # #26). Judged on the nearest existing ancestor, as install.sh does: a vault not created yet is
+    # writable when the folder it would be created in is.
+    base = str(vault)
+    while base and not os.path.lexists(base):
+        base = os.path.dirname(base)
+    base = base or "."  # a relative SMARTTHINK_VAULT resolves against the cwd
+    return os.path.isdir(base) and os.access(base, os.W_OK)
 
 
 def settings_path() -> Path | None:
@@ -502,6 +515,7 @@ def main() -> int:
         reason = ineffective_reason(vault)
         result["permission_rule_effective"] = reason is None
         result["permission_rule_reason"] = reason
+        result["vault_writable"] = vault_writable(vault)
         result.update(script_rules())
     print(json.dumps(result, ensure_ascii=False))
     return 0
