@@ -148,6 +148,66 @@ class ResolveVaultTest(unittest.TestCase):
         )
         self.assertFalse((vault / "profile.md").exists())
 
+    def run_rule(self, vault_env: str | None = None, config_dir: str | None = None) -> dict:
+        # CLAUDE_CONFIG_DIR is controlled explicitly so the runner's own value never leaks in.
+        env = {key: value for key, value in os.environ.items() if key not in ("SMARTTHINK_VAULT", "CLAUDE_CONFIG_DIR")}
+        env["HOME"] = str(self.home)
+        if vault_env is not None:
+            env["SMARTTHINK_VAULT"] = vault_env
+        if config_dir is not None:
+            env["CLAUDE_CONFIG_DIR"] = config_dir
+        completed = subprocess.run(
+            [sys.executable, str(RESOLVER), "--permission-rule"],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        return json.loads(completed.stdout)
+
+    def test_rule_for_default_vault_is_home_relative(self) -> None:
+        result = self.run_rule()
+
+        self.assertEqual(result["source"], "default")
+        self.assertEqual(result["permission_rule"], "Edit(~/.claude/smartthink-vault/**)")
+
+    def test_rule_for_vault_under_home_uses_tilde(self) -> None:
+        result = self.run_rule(vault_env=str(self.home / "notes" / "smartthink"))
+
+        self.assertEqual(result["permission_rule"], "Edit(~/notes/smartthink/**)")
+
+    def test_rule_for_vault_outside_home_uses_double_slash(self) -> None:
+        # A single leading / is relative to the settings file and never matches (issue #14).
+        outside = self.root / "outside-vault"
+
+        result = self.run_rule(vault_env=str(outside))
+
+        self.assertEqual(result["permission_rule"], f"Edit(/{outside}/**)")
+        self.assertTrue(result["permission_rule"].startswith("Edit(//"))
+
+    def test_settings_path_defaults_to_home_claude(self) -> None:
+        result = self.run_rule()
+
+        self.assertEqual(result["settings_path"], str(self.home / ".claude" / "settings.json"))
+
+    def test_settings_path_follows_claude_config_dir(self) -> None:
+        config = self.root / "isolated-config"
+
+        result = self.run_rule(config_dir=str(config))
+
+        self.assertEqual(result["settings_path"], str(config / "settings.json"))
+
+    def test_blank_claude_config_dir_counts_as_unset(self) -> None:
+        result = self.run_rule(config_dir="  ")
+
+        self.assertEqual(result["settings_path"], str(self.home / ".claude" / "settings.json"))
+
+    def test_rule_fields_are_opt_in(self) -> None:
+        result = self.run_resolver()
+
+        self.assertEqual(set(result), {"path", "source"})
+
 
 if __name__ == "__main__":
     unittest.main()
