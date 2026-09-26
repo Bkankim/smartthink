@@ -1244,6 +1244,36 @@ def check_vault_resolver_wiring() -> Result:
     return ok("SKILL.md, lifecycle.md and both installers resolve {VAULT} through resolve-vault.py")
 
 
+# Issue #20: the default vault moved out of ~/.claude with no compatibility path, so the old
+# folder name must not survive as a convention. History (CHANGELOG.md) and tests/ may mention it.
+OLD_VAULT_TOKEN = "smartthink" + "-vault"
+
+
+def old_vault_convention_files() -> list[Path]:
+    files = [
+        REPO_ROOT / name
+        for name in ("README.md", "README.ko.md", "CONTRIBUTING.md", "install.sh", "uninstall.sh", ".gitignore")
+    ]
+    files += sorted((REPO_ROOT / "docs").rglob("*.md"))
+    files += sorted((REPO_ROOT / "scripts").glob("*.py"))
+    files += sorted((REPO_ROOT / "commands").glob("*.md")) + sorted(AGENTS_DIR.glob("*.md"))
+    files += sorted(path for path in SKILL_DIR.rglob("*") if path.is_file() and path.suffix in (".md", ".json"))
+    this_gate = Path(__file__).resolve()
+    return [path for path in files if path.is_file() and path.resolve() != this_gate]
+
+
+def check_no_old_default_vault() -> Result:
+    """The pre-#20 default vault path is gone from docs, scripts and installers."""
+    problems = []
+    for path in old_vault_convention_files():
+        for number, line in enumerate((read_text(path) or "").splitlines(), start=1):
+            if OLD_VAULT_TOKEN in line:
+                problems.append(f"{rel(path)}:{number}: {line.strip()}")
+    if problems:
+        return bad(f"{len(problems)} mention(s) of the pre-#20 default vault", problems)
+    return ok("no convention names the pre-#20 default vault")
+
+
 # Issue #14: a rule path with a single leading / is relative to the settings file, so the vault
 # never matches, and a hardcoded ~/.claude/settings.json ignores CLAUDE_CONFIG_DIR.
 PERMISSION_RULE_LEFTOVERS = (
@@ -1818,6 +1848,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("E", "schema: shipped .data is a blank seed", check_data_is_empty_seed),
     ("E", "vault: {VAULT} comes from resolve-vault.py", check_vault_resolver_wiring),
     ("E", "vault: permission rule is ~/ or // in the resolved settings", check_permission_rule_format),
+    ("E", "vault: no pre-#20 default vault path in the conventions", check_no_old_default_vault),
     ("F", "v2: no --deep mode in SKILL.md", check_no_deep_flag),
     ("F", "v2: SKILL.md frontmatter has no effort/argument-hint", check_skill_frontmatter_clean),
     ("F", "v2: no legacy prefix alias mapping", check_no_legacy_prefix_aliases),

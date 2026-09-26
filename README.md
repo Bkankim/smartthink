@@ -64,8 +64,8 @@ cd smartthink
 ```
 
 It installs one skill (`smartthink`), two agent definitions (`st-thinker`, `st-armorer`), and the
-`/st` command alias, then seeds an empty vault at `~/.claude/smartthink-vault/`
-(override with `SMARTTHINK_VAULT`). Upgrading from v2 also clears the symlink to the agent
+`/st` command alias, then seeds an empty vault at `~/.local/share/smartthink/`
+(`$XDG_DATA_HOME/smartthink` when set; override with `SMARTTHINK_VAULT`). Upgrading from v2 also clears the symlink to the agent
 definition that v3 deleted.
 
 #### Upgrading from an earlier install
@@ -224,7 +224,11 @@ SmartThink adapts to you across three layers.
 
 - **`/st init`** scans locally (project root instruction files, `~/.claude`, 50 git log entries, and
   a notes directory if you name one), shows you what it inferred, asks six short questions you can
-  skip entirely, and writes the profile. It reads only; nothing is transmitted anywhere.
+  skip entirely, and writes the profile. For the vault question it lists note stores it found under
+  your home (Obsidian's vault list, `.obsidian`/`.logseq`/`dendron.yml`/`.foam` markers, folders
+  named like vault or notes, with warnings for stale, near-empty or multi-repo folders) and lets you
+  pick one, create the default, or type a path. It never picks for you. It reads only; nothing is
+  transmitted anywhere.
 - **`/st retain`** works out which frames actually changed a decision and which were loaded but
   never mattered, then shows three separate proposals: routing weight deltas, insight and gap
   changes, and profile deltas. Accept, reject, or edit each one independently. Nothing is written
@@ -232,10 +236,13 @@ SmartThink adapts to you across three layers.
 - **`/st status`** prints the profile summary, the five most recent packs, evolution counts, and an
   environment diagnosis with one line per problem on how to fix it. It writes nothing.
 
-All of it lives **outside the repository**, at `~/.claude/smartthink-vault/` by default. Set
-`SMARTTHINK_VAULT` to use another directory (it is used as-is, even when empty), or pick one during
-`/st init`, which records it in `~/.claude/smartthink-vault/vault-pointer`. `scripts/resolve-vault.py`
-applies these rules. Your insights are never committed.
+All of it lives **outside the repository**, at `${XDG_DATA_HOME:-~/.local/share}/smartthink/` by
+default. Set `SMARTTHINK_VAULT` to use another directory (it is used as-is, even when empty), or pick
+one during `/st init`, which records it in `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`.
+Picking an existing note store puts the vault in its `smartthink/` subfolder and leaves your notes
+alone. `scripts/resolve-vault.py` applies these rules. The vault stays out of `~/.claude` because
+Claude Code asks before every write there, whatever your allow rules say. Your insights are never
+committed.
 
 ---
 
@@ -302,7 +309,8 @@ cd smartthink
 ./uninstall.sh
 ```
 
-Symlinks go, the vault stays. Delete `~/.claude/smartthink-vault/` yourself for a full reset.
+Symlinks go, the vault stays. For a full reset, delete the vault directory it prints yourself, and
+the pointer `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer` if `/st init` wrote one.
 If an earlier copy install left real files behind, `uninstall.sh` stops and asks for
 `./uninstall.sh --migrate-legacy`, which moves them to `~/.claude/.backup/`.
 

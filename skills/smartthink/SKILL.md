@@ -36,7 +36,7 @@ description: >
 - `{VAULT}` - **resolver를 Bash로 실행해 나온 path만 쓴다. 해석하지 마라.**
   `python3 "{SCRIPTS_DIR}/resolve-vault.py" --ensure`가 출력한 JSON의 `path`가 `{VAULT}`다. `--ensure`가 `packs/`와 빈 `evolution-state.md`를 만든다(`profile.md`는 만들지 않는다). 우선순위·폴백 규칙의 정본은 그 스크립트다. 디렉터리가 비어 있다거나 테스트용처럼 보인다는 이유로 다른 경로를 고르지 마라.
   - **resolver 실행이 권한 거부·오류로 실패하면 다른 경로를 만들지 마라.** 임시 디렉터리나 리포 안에 vault를 새로 만드는 것도 폴백이다. 팩 파일 없이 인라인 응답으로 대체하고, 실패한 명령과 이유를 브리핑 첫 줄에 보고한다.
-  - **Bash가 없는 하네스(인라인 경로)만** 직접 정한다: `$SMARTTHINK_VAULT`가 비어 있지 않으면 그 경로 → 아니면 `~/.claude/smartthink-vault/vault-pointer`의 첫 줄 절대경로 → 아니면 `~/.claude/smartthink-vault`. **설정된 env vault는 비어 있거나 없어도 그대로 쓴다. 폴백 금지.** 없으면 `packs/`를 만들어 시드한다.
+  - **Bash가 없는 하네스(인라인 경로)만** 직접 정한다: `$SMARTTHINK_VAULT`가 비어 있지 않으면 그 경로 → 아니면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`의 첫 줄 절대경로 → 아니면 `${XDG_DATA_HOME:-~/.local/share}/smartthink`(XDG 변수는 절대경로일 때만 쓴다). `~/.claude` 아래의 옛 위치는 보지 않는다. **설정된 env vault는 비어 있거나 없어도 그대로 쓴다. 폴백 금지.** 없으면 `packs/`를 만들어 시드한다.
 - 팩 경로 - `{VAULT}/packs/<YYYY-MM-DD>-<슬러그>/`
 
 ---

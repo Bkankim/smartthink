@@ -63,7 +63,8 @@ cd smartthink
 ```
 
 스킬 1개(`smartthink`), 에이전트 정의 2개(`st-thinker`, `st-armorer`), `/st` 명령 별칭을
-설치하고 `~/.claude/smartthink-vault/`에 빈 vault를 시드한다(`SMARTTHINK_VAULT`로 변경 가능).
+설치하고 `~/.local/share/smartthink/`(`XDG_DATA_HOME`이 있으면 `$XDG_DATA_HOME/smartthink`)에 빈 vault를
+시드한다(`SMARTTHINK_VAULT`로 변경 가능).
 v2에서 올라오는 경우 v3에서 삭제된 에이전트 정의를 가리키던 심링크도 함께 정리한다.
 
 #### 이전 설치에서 올라오는 경우
@@ -222,17 +223,22 @@ SmartThink는 3층으로 사용자에게 맞춰 간다.
 
 - **`/st init`**은 로컬만 스캔하고(프로젝트 루트 지침 파일, `~/.claude`, git log 50건, 지정한
   노트 디렉터리) 추정 결과를 먼저 보여준 뒤, 전부 건너뛸 수 있는 6개 질문을 하고 프로필을
-  쓴다. 읽기만 하며 외부로 아무것도 전송하지 않는다.
+  쓴다. vault 질문에서는 홈 아래에서 찾은 노트 보관소 후보(Obsidian 등록 목록, `.obsidian`·`.logseq`·
+  `dendron.yml`·`.foam` 표시 파일, vault·notes 같은 폴더 이름, 오래됨·거의 빔·여러 리포 작업 폴더
+  경고 포함)를 보여 주고 후보·새로 만들기(기본값)·직접 입력 중에서 고르게 한다. 대신 고르지 않는다.
+  읽기만 하며 외부로 아무것도 전송하지 않는다.
 - **`/st retain`**은 어떤 프레임이 실제로 판단을 바꿨고 어떤 것이 로딩만 되고 기여하지
   않았는지 가려낸 뒤, 세 덩어리로 나눠 제안한다. 라우팅 가중치 델타, 인사이트·갭 변경,
   프로필 델타. 각각 따로 수락·거부·수정할 수 있고, 승인 없이는 아무것도 쓰지 않는다.
 - **`/st status`**는 프로필 요약, 최근 팩 5개, 진화 카운트, 환경 진단을 보여주고 문제마다
   무엇을 하면 되는지 한 줄씩 붙인다. 아무것도 쓰지 않는다.
 
-이 전부가 **리포 바깥**에 산다. 기본값은 `~/.claude/smartthink-vault/`다. 다른 디렉터리를 쓰려면
-`SMARTTHINK_VAULT`를 설정하거나(비어 있어도 그대로 쓴다) `/st init`에서 고르면 된다. init은 그 경로를
-`~/.claude/smartthink-vault/vault-pointer`에 기록한다. 이 규칙은 `scripts/resolve-vault.py`가 적용한다.
-개인 인사이트가 리포에 커밋되는 일은 없다.
+이 전부가 **리포 바깥**에 산다. 기본값은 `${XDG_DATA_HOME:-~/.local/share}/smartthink/`다. 다른
+디렉터리를 쓰려면 `SMARTTHINK_VAULT`를 설정하거나(비어 있어도 그대로 쓴다) `/st init`에서 고르면 된다.
+init은 그 경로를 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`에 기록한다. 기존 노트
+보관소를 고르면 그 안 `smartthink/` 하위 폴더를 쓰고 기존 노트는 건드리지 않는다. 이 규칙은
+`scripts/resolve-vault.py`가 적용한다. vault를 `~/.claude` 밖에 두는 이유는 Claude Code가 그 아래
+쓰기를 허용 규칙과 무관하게 매번 묻기 때문이다. 개인 인사이트가 리포에 커밋되는 일은 없다.
 
 ---
 
@@ -296,7 +302,8 @@ cd smartthink
 ./uninstall.sh
 ```
 
-심링크만 지우고 vault는 남는다. 완전 초기화는 `~/.claude/smartthink-vault/`를 직접 삭제하면 된다.
+심링크만 지우고 vault는 남는다. 완전 초기화는 제거 스크립트가 출력한 vault 디렉터리와, `/st init`이
+포인터를 썼다면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`를 직접 삭제하면 된다.
 이전 복사 설치가 남긴 실파일이 있으면 `uninstall.sh`가 멈추고 `./uninstall.sh --migrate-legacy`를
 안내한다. 이 옵션은 잔재를 `~/.claude/.backup/`으로 옮긴다.
 

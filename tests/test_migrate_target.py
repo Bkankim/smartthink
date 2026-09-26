@@ -13,6 +13,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MIGRATE = REPO_ROOT / "scripts" / "migrate-evolution.py"
+# The runner's own vault and XDG locations must never leak into a case.
+CONTROLLED = ("SMARTTHINK_VAULT", "XDG_DATA_HOME", "XDG_CONFIG_HOME")
 LEGACY_STATE = "# SmartThink 진화 상태\n\n## 핵심 인사이트\n- legacy prose\n"
 
 
@@ -21,7 +23,7 @@ class MigrateTargetTest(unittest.TestCase):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name).resolve()
         self.home = self.root / "home"
-        self.default_vault = self.home / ".claude" / "smartthink-vault"
+        self.default_vault = self.home / ".local" / "share" / "smartthink"
         self.default_vault.mkdir(parents=True)
         (self.default_vault / "evolution-state.md").write_text(LEGACY_STATE, encoding="utf-8")
 
@@ -29,7 +31,7 @@ class MigrateTargetTest(unittest.TestCase):
         self._tmp.cleanup()
 
     def run_migrate(self, vault_env: str | None) -> subprocess.CompletedProcess[str]:
-        env = {key: value for key, value in os.environ.items() if key != "SMARTTHINK_VAULT"}
+        env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
         env["HOME"] = str(self.home)
         if vault_env is not None:
             env["SMARTTHINK_VAULT"] = vault_env
