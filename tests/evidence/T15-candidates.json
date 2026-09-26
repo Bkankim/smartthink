@@ -1,0 +1,52 @@
+{
+    "candidates": [
+        {
+            "path": "<ROOT>/home/Documents/Obsidian Vault",
+            "signals": [
+                "registry:obsidian",
+                "marker:.obsidian",
+                "name:vault"
+            ],
+            "last_modified": "2026-09-26",
+            "file_count": 1,
+            "git_repo": false,
+            "warnings": [
+                "nearly-empty"
+            ],
+            "suggested_vault": "<ROOT>/home/Documents/Obsidian Vault/smartthink"
+        },
+        {
+            "path": "<ROOT>/home/workspace",
+            "signals": [
+                "registry:obsidian",
+                "marker:.obsidian"
+            ],
+            "last_modified": "2026-09-26",
+            "file_count": 76,
+            "git_repo": false,
+            "warnings": [
+                "workspace-root"
+            ],
+            "suggested_vault": "<ROOT>/home/workspace/smartthink"
+        },
+        {
+            "path": "<ROOT>/home/workspace/vault",
+            "signals": [
+                "name:vault"
+            ],
+            "last_modified": "2026-09-26",
+            "file_count": 44,
+            "git_repo": true,
+            "warnings": [],
+            "suggested_vault": "<ROOT>/home/workspace/vault/smartthink"
+        }
+    ],
+    "create_new": {
+        "path": "<ROOT>/home/.local/share/smartthink"
+    },
+    "scan": {
+        "root": "<ROOT>/home",
+        "max_depth": 3,
+        "timed_out": false
+    }
+}
