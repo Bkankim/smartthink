@@ -1178,9 +1178,9 @@ PERMISSION_RULE_WARNINGS = ("쓰지 마라", "NG", "매칭 안 됨")
 
 
 def check_permission_rule_format() -> Result:
-    """init/status must install and accept only ~/ or // vault rules in the resolved settings file."""
+    """init/status and every doc that describes the rule must name only ~/ or // rules in the resolved settings."""
     problems: list[str] = []
-    for path in (REFERENCES_DIR / "lifecycle.md", SKILL_MD):
+    for path in (REFERENCES_DIR / "lifecycle.md", SKILL_MD, DATA_DIR / "README.md", ANALYSIS_METHOD_MD):
         for number, line in enumerate((read_text(path) or "").splitlines(), start=1):
             for pattern, reason in PERMISSION_RULE_LEFTOVERS:
                 if not re.search(pattern, line):
