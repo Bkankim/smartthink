@@ -21,6 +21,7 @@ LIFECYCLE = Path("skills") / "smartthink" / "references" / "lifecycle.md"
 ARMORER = Path("agents") / "st-armorer.md"
 FALLBACK = Path("skills") / "smartthink" / "references" / "armorer-prompt.md"
 CHECK_LINE = "D. wiring: session Bash instructions are single commands"
+BUNDLE_LINE = "D. wiring: SKILL.md arming Bash stays inside the rule bundle"
 
 # The shapes observed in T9 and T15 (tests/evidence), written the way a doc would show them.
 COMPOUND_BLOCKS = (
@@ -86,6 +87,39 @@ class SessionBashCheckTest(unittest.TestCase):
         for target in (SKILL, LIFECYCLE, ARMORER, FALLBACK):
             with self.subTest(target=str(target)):
                 self.assert_fails_with(target, COMPOUND_INLINE)
+
+    def test_skill_md_bash_outside_the_rule_bundle_fails(self) -> None:
+        # final-review 20260927-064432 (a)1: the index.json fallback told the main session to run
+        # `wc -c`, a single command but one no init rule covers, so it prompted on every such run.
+        tampered = (
+            "- **index.json이 없으면**: 선택 모듈 파일의 크기를 직접 재고(`wc -c`) 같은 계수로 근사하라.",
+            "vault가 있는지 `ls -la {VAULT}`로 확인한다.",
+            "`python3 {SCRIPTS_DIR}/migrate-evolution.py --write`를 실행한다.",
+        )
+        path = self.copy / SKILL
+        original = path.read_text(encoding="utf-8")
+        for line in tampered:
+            with self.subTest(line=line):
+                path.write_text(original + "\n" + line + "\n", encoding="utf-8")
+                try:
+                    result = self.run_checker()
+                finally:
+                    path.write_text(original, encoding="utf-8")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                lines = [row for row in result.stdout.splitlines() if BUNDLE_LINE in row]
+                self.assertEqual(len(lines), 1, result.stdout)
+                self.assertTrue(lines[0].startswith("FAIL"), result.stdout)
+
+    def test_prohibited_or_bundled_commands_in_skill_md_pass(self) -> None:
+        path = self.copy / SKILL
+        path.write_text(
+            path.read_text(encoding="utf-8")
+            + "\n`wc -c` 같은 Bash로 재지 마라. `python3 {SCRIPTS_DIR}/resolve-vault.py --module-sizes a.md`를 쓴다.\n",
+            encoding="utf-8",
+        )
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertTrue([row for row in result.stdout.splitlines() if BUNDLE_LINE in row][0].startswith("PASS"))
 
     def test_operators_inside_quotes_or_prose_pass(self) -> None:
         # A quoted ; or | is an argument, and a bare `&&` span names the operator in prose.

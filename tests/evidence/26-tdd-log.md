@@ -51,3 +51,29 @@ SUBFAILED(doc='skills/smartthink/references/lifecycle.md', call='python3 "{SCRIP
 - S2-1·S2-2: `resolve-vault.py`에 `script_rules()`(`command_prefixes`·`bash_rules`·`bash_rules_effective`·`read_rule`·`read_rule_effective`) 추가 뒤 green.
 - S2-3: SKILL.md·lifecycle.md의 `python3 "{SCRIPTS_DIR}/resolve-vault.py"`(따옴표) 4곳을 `python3 {SCRIPTS_DIR}/resolve-vault.py`로 바꾼 뒤 `3 passed, 15 subtests passed in 0.11s`.
 - 전체: `uv run --with pytest pytest -q tests` → `94 passed, 51 subtests passed in 6.89s`, `python3 scripts/check-structure.py` exit=0.
+
+## final-review 20260927-064432 후속
+
+### S2-4 resolver --module-sizes가 index.json 부재 폴백의 `wc -c`를 대신한다 ((a)1)
+
+```
+E       AssertionError: 2 != 0 : usage: resolve-vault.py [-h] [--ensure] [--permission-rule] [--candidates]
+E       resolve-vault.py: error: unrecognized arguments: --module-sizes core-engines.md meta-cognition.md
+1 failed, 3 deselected in 0.04s
+```
+
+### S1-2 SKILL.md의 규칙 묶음 밖 Bash 지시(`wc -c`, `ls -la`, 다른 스크립트)가 D를 FAIL시킨다 ((a)1)
+
+```
+E               AssertionError: 0 != 1 : PASS A. layout: required paths exist
+E               39 passed, 0 failed, 5 skipped
+tests/test_check_structure_bash.py:108: AssertionError
+```
+
+### S2-5 read_rules가 install.sh 링크 경로(~/.claude/skills/smartthink, $CLAUDE_CONFIG_DIR/skills/smartthink)를 더한다 ((c))
+
+```
+E       KeyError: 'read_rules'
+tests/test_permission_bundle.py:115: KeyError
+2 failed
+```

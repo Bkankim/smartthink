@@ -1155,6 +1155,37 @@ def check_session_bash_single_commands() -> Result:
     return ok("SKILL.md, lifecycle.md and the armorer definition and fallback show single commands only")
 
 
+# The arming commands `st init` installs a rule for (or, for readlink, the one install.sh extra):
+# SKILL.md must not tell the main session to run anything else (final-review of #26 (a)1).
+BUNDLE_COMMAND_RE = re.compile(
+    r"^(?:python3 \{SCRIPTS_DIR\}/(?:resolve-vault\.py|assemble-pack\.py|<)|readlink \{SKILL_DIR\})"
+)
+# A command named on a line that forbids it is a prohibition, not an instruction.
+PROHIBITION_RE = re.compile(r"마라|말고|금지|않는다|하지 않")
+
+
+def check_skill_bash_inside_bundle() -> Result:
+    """SKILL.md shows the main session no Bash beyond the rule bundle, except to forbid it."""
+    text = read_text(SKILL_MD)
+    if text is None:
+        return bad(f"{rel(SKILL_MD)} is missing or unreadable")
+    problems: list[str] = []
+    for offset, command in _shell_commands(text):
+        if len(command.split()) < 2 or BUNDLE_COMMAND_RE.match(command):
+            continue
+        start = text.rfind("\n", 0, offset) + 1
+        end = text.find("\n", offset)
+        if PROHIBITION_RE.search(text[start:end if end >= 0 else None]):
+            continue
+        problems.append(
+            f"{rel(SKILL_MD)}:{line_of(text, offset)} tells the session to run `{command[:60]}`, which no "
+            "init rule covers; use Read/Glob or a resolve-vault.py/assemble-pack.py option instead"
+        )
+    if problems:
+        return bad(f"{len(problems)} Bash instruction(s) outside the rule bundle", problems)
+    return ok("SKILL.md names only resolve-vault.py, assemble-pack.py and the install.sh readlink as Bash")
+
+
 # The three marker spellings pack section 5 is built from. analysis-method.md is the SSOT;
 # st-armorer.md needs its own copy because the armorer is told to read only Step 0.5 of that
 # file, so a format written down there alone is a format the pack writer never sees.
@@ -2005,6 +2036,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("D", "wiring: st-armorer assembles section 5 with assemble-pack.py", check_armorer_assembles_with_script),
     ("D", "wiring: section 5 module marker forms match the SSOT", check_module_marker_forms),
     ("D", "wiring: session Bash instructions are single commands", check_session_bash_single_commands),
+    ("D", "wiring: SKILL.md arming Bash stays inside the rule bundle", check_skill_bash_inside_bundle),
     ("D", "wiring: headless gate signals and branches", check_headless_gate_branch),
     ("E", "schema: evolution-state.md v3 header", check_evolution_state_schema),
     ("E", "schema: profile.md v3 header", check_profile_schema),

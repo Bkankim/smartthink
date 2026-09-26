@@ -287,7 +287,7 @@ Agent 도구가 없는 하네스(Codex 등)에서 메인이 직접 수행하는 
 
 **레퍼런스 크기**는 `{SKILL_DIR}/references/index.json`에서 읽는다. 빌드 시 생성되며 각 레퍼런스의 바이트 크기와 `bytes / 2.2` 근사 토큰이 들어 있다.
 
-- **index.json이 없으면**: 선택 모듈 파일의 크기를 직접 재고(`wc -c`) 같은 계수(`bytes / 2.2`)로 근사하라. 게이트 4항목에 `※ index.json 없음, 실측 근사`를 덧붙여라.
+- **index.json이 없으면**: `python3 {SCRIPTS_DIR}/resolve-vault.py --module-sizes <모듈 파일명...>` 한 줄로 선택 모듈 파일의 실측 크기와 같은 계수(`bytes / 2.2`)의 근사 토큰을 받는다(init 규칙 묶음의 resolver 규칙이 덮는다. `wc -c` 같은 Bash로 재지 마라). 게이트 4항목에 `※ index.json 없음, 실측 근사`를 덧붙여라.
 - **리서치·합성은 고정 상수 15K**로 잡는다. 검색 라운드 수로 변주하지 마라.
 
 계산:
