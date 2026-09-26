@@ -77,12 +77,13 @@ Each fact lives in exactly one place. Everything else references it.
 | `references/analysis-method.md` | The analysis pipeline itself | Methodology, the self-audit step, verbatim-integrity rules, the evolution-state schema and merge protocol |
 | `references/lifecycle.md` | `init`, `retain`, `status` procedures | What is scanned, what is asked, what is proposed, what requires approval |
 | `references/thinker-prompt.md` | The report path when the agent definition is absent | Nothing. It is a deliberate duplicate of the agent definition and must be kept in sync with it |
+| `references/armorer-prompt.md` | The armorer path when the agent definition is absent (read from disk, never recovered from git history) | Nothing. It is a deliberate duplicate of the armorer definition and must be kept in sync with it |
 | `.data/README.md` | Ships blank seed templates | Vault layout, pack retention, permissions, privacy |
 | The vault | All user state: profile, evolution state, packs | Lives outside the repository. Nothing personal is ever committed |
 
 Two duplications are deliberate, because each side must work when the other is missing: the pack
-section titles and manifest fields, shared by `SKILL.md` and the armorer; and the thinker's static
-instructions, shared with the fallback prompt. Both are checked mechanically by
+section titles and manifest fields, shared by `SKILL.md` and the armorer; and the static instructions
+of the armorer and the thinker, each shared with its fallback prompt. Both are checked mechanically by
 `scripts/check-structure.py`, because a duplicate that drifts is worse than no duplicate at all.
 
 ---
