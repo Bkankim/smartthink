@@ -40,9 +40,9 @@ class PermissionBundleTest(unittest.TestCase):
             (plugin_root / "scripts" / name).write_bytes((REPO_ROOT / "scripts" / name).read_bytes())
         (plugin_root / "skills" / "smartthink").mkdir(parents=True)
 
-    def bundle(self, scripts_dir: Path) -> dict:
+    def bundle(self, scripts_dir: Path, **extra: str) -> dict:
         env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
-        env.update(HOME=str(self.home), SMARTTHINK_VAULT=str(self.vault))
+        env.update(HOME=str(self.home), SMARTTHINK_VAULT=str(self.vault), **extra)
         completed = subprocess.run(
             [sys.executable, str(scripts_dir / "resolve-vault.py"), "--permission-rule"],
             env=env,
@@ -92,6 +92,71 @@ class PermissionBundleTest(unittest.TestCase):
         result = self.bundle(self.root / "link" / "scripts")
         self.assertEqual(result["read_rule"], f"Read(/{self.root}/link/skills/smartthink/**)")
         self.assertIs(result["read_rule_effective"], True)
+
+    def test_read_rules_add_the_install_sh_link_the_session_reads_through(self) -> None:
+        # final-review 20260927-064432 (c): install.sh links ~/.claude/skills/smartthink to the
+        # checkout, the session Reads through that link, and a rule naming only the checkout path
+        # still prompted (T16-after, install.sh row). The link path must be in the bundle too.
+        self.install_copy(self.root / "checkout")
+        skill = self.root / "checkout" / "skills" / "smartthink"
+        user_skills = self.home / ".claude" / "skills"
+        user_skills.mkdir(parents=True)
+        (user_skills / "smartthink").symlink_to(skill)
+        config = self.root / "cfg"
+        (config / "skills").mkdir(parents=True)
+        (config / "skills" / "smartthink").symlink_to(skill)
+        unrelated = self.root / "other-skill"
+        unrelated.mkdir()
+        (user_skills / "other").symlink_to(unrelated)
+
+        result = self.bundle(self.root / "checkout" / "scripts", CLAUDE_CONFIG_DIR=str(config))
+
+        self.assertEqual(
+            result["read_rules"],
+            [
+                f"Read(/{skill}/**)",
+                "Read(~/.claude/skills/smartthink/**)",
+                f"Read(/{config}/skills/smartthink/**)",
+            ],
+        )
+
+    def test_read_rules_for_a_plugin_install_hold_only_the_skill_dir(self) -> None:
+        self.install_copy(self.root / "plugin")
+        result = self.bundle(self.root / "plugin" / "scripts")
+        self.assertEqual(result["read_rules"], [result["read_rule"]])
+
+    def test_module_sizes_replace_the_wc_fallback(self) -> None:
+        # final-review 20260927-064432 (a)1: without index.json the gate measured module sizes with
+        # Bash `wc -c`, a command outside the rule bundle. The resolver, already allowed, reports them.
+        self.install_copy(self.root / "plugin")
+        references = self.root / "plugin" / "skills" / "smartthink" / "references"
+        references.mkdir()
+        (references / "core-engines.md").write_bytes(b"x" * 22)
+        (references / "meta-cognition.md").write_bytes(b"y" * 100)
+        env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
+        env.update(HOME=str(self.home), SMARTTHINK_VAULT=str(self.vault))
+        script = self.root / "plugin" / "scripts" / "resolve-vault.py"
+
+        def run(*names: str) -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [sys.executable, str(script), "--module-sizes", *names],
+                env=env, cwd=self.root, capture_output=True, text=True, check=False,
+            )
+
+        result = run("core-engines.md", "meta-cognition.md")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            json.loads(result.stdout),
+            {"modules": {
+                "core-engines.md": {"bytes": 22, "est_tokens": 10},
+                "meta-cognition.md": {"bytes": 100, "est_tokens": 45},
+            }},
+        )
+        for bad in ("../scripts/resolve-vault.py", "missing.md"):
+            with self.subTest(name=bad):
+                refused = run(bad)
+                self.assertNotEqual(refused.returncode, 0, refused.stdout)
+                self.assertEqual(refused.stdout, "")
 
     def test_every_documented_script_call_starts_with_its_rule_prefix(self) -> None:
         # The rule only helps if the command a doc shows, with {SCRIPTS_DIR} filled in, starts with

@@ -25,7 +25,10 @@ It also prints the rest of the bundle `st init` offers so an arming run asks not
 "bash_rules" and "command_prefixes" for the two scripts a session runs (this one and
 assemble-pack.py, taken from the path this script was invoked by, symlinks not resolved) with
 "bash_rules_effective", and "read_rule" for the sibling skills/smartthink/ directory the session and
-the armorer Read, with "read_rule_effective".
+the armorer Read, with "read_rule_effective"; "read_rules" adds the user-level skills/smartthink
+symlinks (install.sh) that resolve to that directory, since the session Reads through the link.
+--module-sizes NAME... prints {"modules": {name: {"bytes", "est_tokens"}}} for files in the sibling
+skills/smartthink/references/, the gate's fallback when index.json is missing.
 --ensure also creates packs/ and copies the evolution-state template when absent. profile.md is
 left to `st init`.
 --candidates instead lists existing note stores under HOME for `st init` step 5 to offer: signals,
@@ -168,8 +171,44 @@ def script_rules() -> dict:
         "bash_rules": [f"Bash({prefix} *)" for prefix in prefixes.values()],
         "bash_rules_effective": not any(char.isspace() or char in SHELL_SPECIAL for char in scripts_dir),
         "read_rule": path_rule("Read", skill_dir),
+        "read_rules": [path_rule("Read", path) for path in (skill_dir, *linked_skill_dirs(skill_dir))],
         "read_rule_effective": not RULE_SYNTAX.intersection(str(skill_dir)),
     }
+
+
+def linked_skill_dirs(skill_dir: Path) -> list[Path]:
+    # install.sh links <user skills>/smartthink to the checkout, and the session Reads references/
+    # through that link, not through the checkout path; a rule naming only the checkout path still
+    # prompted (final-review of #26 (c), T16-after install.sh row). Claude Code loads user skills
+    # from $CLAUDE_CONFIG_DIR when set, install.sh writes ~/.claude, so both are candidates.
+    real = os.path.realpath(skill_dir)
+    candidates = [Path.home() / ".claude" / "skills" / "smartthink"]
+    config_dir = (os.environ.get("CLAUDE_CONFIG_DIR") or "").strip()
+    if config_dir and Path(config_dir).expanduser().is_absolute():
+        candidates.append(Path(os.path.abspath(Path(config_dir).expanduser())) / "skills" / "smartthink")
+    linked: list[Path] = []
+    for candidate in candidates:
+        if candidate != skill_dir and candidate not in linked and candidate.is_symlink() and os.path.realpath(candidate) == real:
+            linked.append(candidate)
+    return linked
+
+
+# bytes -> token estimate, the divisor build-index.py uses for index.json.
+TOKEN_DIVISOR = 2.2
+
+
+def module_sizes(names: list[str]) -> dict:
+    # The gate's fallback when references/index.json is missing (final-review of #26 (a)1): the
+    # session used to measure files with Bash `wc -c`, a command no allow rule covers. This script
+    # already has one, so it reports the sizes. Only plain file names inside references/ are read.
+    references = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "skills" / "smartthink" / "references"
+    modules = {}
+    for name in names:
+        if Path(name).name != name or not (references / name).is_file():
+            raise ValueError(f"not a file in {references}: {name}")
+        size = (references / name).stat().st_size
+        modules[name] = {"bytes": size, "est_tokens": round(size / TOKEN_DIVISOR)}
+    return {"modules": modules}
 
 
 def settings_path() -> Path | None:
@@ -431,7 +470,20 @@ def main() -> int:
         metavar="SECONDS",
         help="with --candidates: stop walking HOME after this many seconds (default 10)",
     )
+    parser.add_argument(
+        "--module-sizes",
+        nargs="+",
+        metavar="NAME",
+        help="print bytes and est_tokens of these references/ files (gate fallback without index.json)",
+    )
     arguments = parser.parse_args()
+    if arguments.module_sizes:
+        try:
+            print(json.dumps(module_sizes(arguments.module_sizes), ensure_ascii=False))
+        except ValueError as error:
+            print(f"error: {error}", file=sys.stderr)
+            return 1
+        return 0
     if arguments.candidates:
         print(json.dumps(candidates(arguments.time_limit), ensure_ascii=False))
         return 0
