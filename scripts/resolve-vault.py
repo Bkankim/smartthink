@@ -85,8 +85,9 @@ def permission_rule(vault: Path) -> str:
 def rule_is_effective(vault: Path) -> bool:
     # Claude Code prompts for every write under $HOME/.claude ("a sensitive file") even when an
     # allow rule matches, and this follows HOME, not CLAUDE_CONFIG_DIR (issue #14 probes P1-P6).
+    # Compare real paths so a vault reached through a symlink into ~/.claude is still caught.
     try:
-        vault.relative_to(Path.home() / ".claude")
+        Path(os.path.realpath(vault)).relative_to(os.path.realpath(Path.home() / ".claude"))
     except ValueError:
         return True
     return False

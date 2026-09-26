@@ -212,6 +212,17 @@ class ResolveVaultTest(unittest.TestCase):
         self.assertTrue(self.run_rule(vault_env=str(self.home / "notes" / "smartthink"))["permission_rule_effective"])
         self.assertTrue(self.run_rule(vault_env=str(self.root / "outside"))["permission_rule_effective"])
 
+    def test_symlink_into_home_claude_is_not_effective(self) -> None:
+        # The rule string keeps the user's spelling; only the effectiveness check resolves links.
+        self.default_vault.mkdir(parents=True)
+        link = self.home / "vault-link"
+        link.symlink_to(self.default_vault)
+
+        result = self.run_rule(vault_env=str(link))
+
+        self.assertFalse(result["permission_rule_effective"])
+        self.assertEqual(result["permission_rule"], "Edit(~/vault-link/**)")
+
     def test_config_dir_does_not_change_effectiveness(self) -> None:
         # The sensitive-path check follows HOME, so a vault inside CLAUDE_CONFIG_DIR is fine.
         config = self.root / "isolated-config"
