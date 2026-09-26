@@ -1,0 +1,22 @@
+{
+  "task": "지역 박물관의 안내 표지 체계를 개선해줘",
+  "interpretation": "특정 지역 박물관의 방문객 안내 표지 체계(길찾기, 전시 해설, 시설 안내)를 진단하고 개선안을 설계하는 작업. 대상·규모·예산 미특정이라 예상 작업 A(현행 표지 감사) / B(표지 체계 재설계) / C(다국어·접근성·디지털 확장 설계)를 모두 과녁으로 둔다.",
+  "cynefin": "Complicated",
+  "classification": "문제 해결 (체계적 발명 경계)",
+  "modules": [
+    "core-engines.md",
+    "cognitive-arsenal.md",
+    "triz-innovation.md",
+    "pattern-synthesis.md",
+    "execution-velocity.md"
+  ],
+  "budget": null,
+  "research": true,
+  "profile_version": null,
+  "est_tokens": {
+    "pack": 140039,
+    "agent": 144207
+  },
+  "created": "2026-09-26T23:30:00+09:00",
+  "harness": "claude-code"
+}
