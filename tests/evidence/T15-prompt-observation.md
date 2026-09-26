@@ -72,6 +72,11 @@ arm A12 [armorer] Bash check-structure --pack results + em dash count (Bash, #21
 arm A13 [main] Bash cd pack && ls; grep headings; cat manifest -> 1 Yes
 ```
 
+## 코디네이터 개입과 편차
+
+- init 사전 스캔 중 `Bash ls <가짜 홈 vault>`(기본 위치 `~/.local/share/smartthink` 목록) 승인 프롬프트가 130초 방치돼 코디네이터 워치독이 `1`(1회 승인)로 응답했다. 위 기록에 없는 프롬프트 1건(init, P4와 사전 스캔 결과 사이)이며 vault Write/Edit가 아니라 판정에 영향이 없다. init Bash 프롬프트는 이를 포함해 12회다.
+- 코디네이터의 "측정 대상 아닌 도구(Read·Glob·Grep·읽기 Bash 등)를 격리 settings.json allow에 미리 넣으라"는 지시는 T15 실측이 끝난 뒤 확인했다. 이 실행의 격리 settings.json에는 사전 허용 목록이 없었다(위 원문 그대로). 그래서 소음 프롬프트가 많지만, 사전 허용이 없으므로 vault Write 프롬프트 0회라는 결론은 더 보수적인 조건에서 얻은 것이다.
+
 ## 판정: PASS
 
 - ⑤에서 `resolve-vault.py --candidates` 결과 3개 후보가 신호·수정일·파일 수·git 여부·경고와 함께 번호 목록으로 떴고, "새로 만들기(기본값)"·"직접 입력"이 끝에 붙었다. 모델이 "이 문항은 제가 미리 골라 두지 않았습니다"라고 명시했고 Enter 수락 기본값이나 추천 표시가 없었다(`T15-transcript.md` 1절). 앞 두 후보에 경고가 붙었다.
@@ -83,7 +88,7 @@ arm A13 [main] Bash cd pack && ls; grep headings; cat manifest -> 1 Yes
 
 ## 기록만 (범위 밖)
 
-- Bash 프롬프트: init 11회, 무장 12회(A1~A3, A5~A13). 특히 armorer가 팩 5·6절 추가(A9·A10)와 `manifest.json` 작성(A11)을 Bash heredoc으로 해서 Edit 규칙이 덮지 못한다. #21 소관.
+- Bash 프롬프트: init 12회(코디네이터 응답 1회 포함), 무장 12회(A1~A3, A5~A13). 특히 armorer가 팩 5·6절 추가(A9·A10)와 `manifest.json` 작성(A11)을 Bash heredoc으로 해서 Edit 규칙이 덮지 못한다. #21 소관.
 - A3·A5·A13의 "Compound command contains cd with a relative file read while a Read() deny rule exists" 경고는 이 게이트가 넣은 실제 홈 보호 deny 규칙 때문이다.
 - Read 프롬프트: 플러그인 디렉터리의 references·.data 읽기와 격리 settings.json 읽기(P1, P6, P15, A4).
 - init이 사전 스캔 단계에서 `--ensure`를 먼저 실행해 가짜 홈 기본 위치(`~/.local/share/smartthink`)에 빈 `packs/`·`evolution-state.md`를 만들었고, 다른 곳을 고른 뒤 쓰이지 않는 폴더로 남았다. 이 관찰 뒤 lifecycle.md 공통 규약과 ⑤ 0번에 "init은 ⑤ 확정 전까지 `--ensure` 없이 실행"을 추가했다(수정 뒤 재실측은 하지 않음).
