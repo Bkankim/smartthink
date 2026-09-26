@@ -65,11 +65,11 @@ T8·T9처럼 사용자 레벨 정의나 권한 규칙이 결과를 바꾸는 게
 export ST_CFG="$(mktemp -d)"
 echo '{}' > "$ST_CFG/settings.json"                                   # permissions 없는 유효 JSON
 echo '{"hasCompletedOnboarding":true,"theme":"dark"}' > "$ST_CFG/.claude.json"   # 첫 실행 온보딩·로그인 화면 생략
-CLAUDE_CONFIG_DIR="$ST_CFG" CLAUDE_CODE_OAUTH_TOKEN="<토큰>" SMARTTHINK_VAULT="$ST_VAULT" \
+CLAUDE_CONFIG_DIR="$ST_CFG" CLAUDE_CODE_OAUTH_TOKEN="$ANTHROPIC_OAUTH_TOKEN" SMARTTHINK_VAULT="$ST_VAULT" \
   claude --plugin-dir . --model opus
 ```
 
-- 격리 설정에는 로그인 정보가 없다. 인증은 `CLAUDE_CODE_OAUTH_TOKEN`을 이 자식 프로세스 환경에만 넣어 주입한다. 토큰 값은 증거·로그에 남기지 않는다(`[REDACTED]`).
+- 격리 설정에는 로그인 정보가 없다. 인증은 `CLAUDE_CODE_OAUTH_TOKEN`을 이 자식 프로세스 환경에만 넣어 주입한다. 값은 이미 셸 환경에 있는 변수(예: `$ANTHROPIC_OAUTH_TOKEN`)로 참조하고 명령줄에 리터럴로 쓰지 않는다. 리터럴은 셸 히스토리에 남는다. 토큰 값은 증거·로그에 남기지 않는다(`[REDACTED]`).
 - 첫 실행은 폴더 신뢰 확인 화면이 뜬다. `Yes, I trust this folder`를 고른다.
 - 격리 설정의 기본 권한 모드는 auto다(상태줄 `⏵⏵ auto mode on`). 권한 프롬프트를 관찰하는 게이트는 `--permission-mode default`를 붙이고 상태줄이 `⏸ manual mode on`인지 확인한다.
 - 게이트에서 빈 Enter는 Claude Code·Codex 입력창이 비어 있으면 제출되지 않는다. `진행`처럼 텍스트로 답하고 그 사실을 트랜스크립트에 적는다.
@@ -79,6 +79,7 @@ CLAUDE_CONFIG_DIR="$ST_CFG" CLAUDE_CODE_OAUTH_TOKEN="<토큰>" SMARTTHINK_VAULT=
 ```bash
 test -n "$ST_VAULT" && test -d "$ST_VAULT" && rm -rf "$ST_VAULT"
 test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
+test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세션을 썼을 때
 ```
 
 ## 3. 게이트 T1~T14
@@ -206,9 +207,9 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
   - 규칙 설치 뒤 비교는 **새 세션**에서도 한다. 실행 중 세션의 설정 반영 여부와 규칙 자체의 효과를 구분하기 위해서다.
 - **입력**: 새 임시 vault로 `/smartthink:smartthink init`을 실행해 권한 규칙 설치 제안을 거절한 뒤, `/smartthink:smartthink 지역 문화센터 수업 신청 흐름을 개선해줘`를 입력한다. 프롬프트 발생 여부와 도구·경로를 기록한 뒤 새 세션에서 `/smartthink:smartthink init`을 다시 실행해 `Edit(<VAULT>/**)` 설치를 승인하고 같은 무장 명령을 재실행한다. 설치 대상이 격리 설정이 아니라 `~/.claude/settings.json`이면 그 쓰기를 거절하고 `$CLAUDE_CONFIG_DIR/settings.json`을 대상으로 지시한 뒤 그 사실을 기록한다.
 - **통과 기준**:
-  - 첫 init은 `Edit(<VAULT>/**)` 규칙 설치 여부를 묻고, 승인 전에는 `settings.json`을 바꾸지 않는다.
+  - 첫 init은 vault 쓰기 허용 규칙(아래 형식 주의) 설치 여부를 묻고, 승인 전에는 `settings.json`을 바꾸지 않는다.
   - 첫 무장 중 백그라운드 Write 권한 프롬프트가 뜨는지 또는 뜨지 않는지가 관찰 결과로 명시된다. 어느 결과도 단독으로 FAIL은 아니다.
-  - 승인 뒤에는 기존 JSON을 보존한 머지로 `permissions.allow`에 정확히 현재 vault를 가리키는 `Edit(<VAULT>/**)` 항목 하나만 추가하거나, 이미 있으면 중복 추가하지 않는다. Claude Code는 `/`로 시작하는 규칙 경로를 설정 파일 기준 상대경로로 해석하므로, 절대경로 vault를 가리키려면 `Edit(//<절대경로>/**)` 또는 `Edit(~/<홈 기준 경로>/**)` 형식이어야 한다.
+  - 승인 뒤에는 기존 JSON을 보존한 머지로 `permissions.allow`에 정확히 현재 vault를 가리키는 `Edit(<VAULT>/**)` 항목 하나만 추가하거나, 이미 있으면 중복 추가하지 않는다. Claude Code는 `/`로 시작하는 규칙 경로를 설정 파일 기준 상대경로로 해석하므로, 절대경로 vault를 가리키려면 `Edit(//<절대경로>/**)` 또는 `Edit(~/<홈 기준 경로>/**)` 형식이어야 한다. 단일 `/`로 시작하는 `Edit(/<절대경로>/**)`가 설치되면 이 기준은 FAIL이다(결함 추적: #14).
   - 설치 대상은 현재 세션의 사용자 설정 파일이다(`CLAUDE_CONFIG_DIR`가 있으면 그 안의 `settings.json`).
   - 재시도 결과와 프롬프트 발생 여부를 첫 시도와 비교해 기록한다. 규칙 설치 뒤 새 세션에서도 vault Write 프롬프트가 뜨면 규칙이 vault와 매칭되지 않는 것이다.
 - **증거**: `T9-settings.diff`, `T9-transcript.md`, `T9-prompt-observation.md`를 남긴다. diff에는 `permissions.allow` 관련 전후만 남기고 무관한 설정은 `[REDACTED]`로 처리한다.
@@ -257,9 +258,9 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 
 - **목적**: Agent 도구가 없는 Codex 환경에서 동등한 팩 명세와 브리핑을 만드는 인라인 경로를 별도로 실측한다.
 - **사전 조건**: Codex에서 리포지터리 파일을 읽고 `$SMARTTHINK_VAULT`에 쓸 수 있는 별도 대화형 세션이다. Claude 전용 플러그인 진입이 Codex에 없으면 이 게이트는 `BLOCKED`로 남겨도 된다.
-  - **스킬 등록**: `ln -s <리포>/skills/smartthink ~/.codex/skills/smartthink`. 대화형 세션의 `/skills` → `List skills`에 `smartthink`가 보여야 한다.
+  - **스킬 등록**: `ln -s <리포>/skills/smartthink ~/.codex/skills/smartthink`. 등록 전 `ls -la ~/.codex/skills/smartthink`로 기존 링크를 확인하고, 등록 뒤 `readlink ~/.codex/skills/smartthink`가 검증 대상 체크아웃을 가리키는지 기록한다(다른 체크아웃이면 그 체크아웃의 SKILL.md가 로딩된다). 대화형 세션의 `/skills` → `List skills`에 `smartthink`가 보여야 한다.
   - **리포 밖 cwd**에서 시작한다(`mktemp -d`). cwd가 리포면 Codex가 등록 없이도 `skills/smartthink/SKILL.md`를 스스로 읽어 게이트를 흉내 내므로 등록 여부를 판별할 수 없다.
-  - **vault 환경 변수는 `-c`로 넘긴다.** Codex TUI는 공유 로컬 app-server 데몬에서 명령을 실행해, TUI를 띄운 셸의 환경 변수가 도구 명령에 전달되지 않을 수 있다. 그러면 resolver가 `source: default`로 실제 기본 vault를 고른다. `-c 'shell_environment_policy.set.SMARTTHINK_VAULT="<임시 vault>"'`를 붙이고, 첫 resolver 출력이 `"source": "env"`인지 확인한다. `default`가 보이면 즉시 중단한다.
+  - **vault 환경 변수는 `-c`로 넘긴다.** Codex TUI는 공유 로컬 app-server 데몬에서 명령을 실행해, TUI를 띄운 셸의 환경 변수가 도구 명령에 전달되지 않을 수 있다. 그러면 resolver가 `source: default`로 실제 기본 vault를 고른다. `-c 'shell_environment_policy.set.SMARTTHINK_VAULT="<임시 vault>"'`를 붙이고, 첫 resolver 출력이 `"source": "env"`인지 확인한다. `default`가 보이면 즉시 중단한다. 대화형 세션을 띄우기 **전에** 같은 `-c` 값으로 `codex exec -c 'shell_environment_policy.set.SMARTTHINK_VAULT="<임시 vault>"' 'printenv SMARTTHINK_VAULT'`를 실행해 임시 vault 경로가 출력되는지 먼저 확인한다. 사후 확인만으로는 resolver가 이미 기본 vault를 읽은 뒤다.
   - **인라인 경로는 서브에이전트 도구가 없는 Codex에서만 관찰된다.** 멀티 에이전트 기능(`spawn_agent`)이 있는 Codex에서는 0단계가 armorer 경로를 고르는 것이 명세대로다. 도구 목록에 `spawn_agent`가 있는지 먼저 기록한다.
 - **입력**: 리포 밖 임시 cwd에서 `SMARTTHINK_VAULT="$ST_VAULT" codex -c 'shell_environment_policy.set.SMARTTHINK_VAULT="'"$ST_VAULT"'"'`를 실행한 뒤, 새 Codex 세션에 `$smartthink 지역 보행자 안전 안내를 개선해줘`를 입력한다(`$`로 스킬 목록을 열어 선택). Codex 스킬은 슬래시 명령이 아니어서 `/smartthink …`는 `Unrecognized command '/smartthink'`로 끝난다. 호출이 인식되지 않으면 실제 오류와 실행 환경을 기록하고 중단한다.
 - **통과 기준**:
@@ -314,13 +315,13 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 | T6 | PASS | 2026-09-08 | T6-transcript.md, T6-briefing-source.md | 게이트 미표시, 1절 바이트 동일 출력, 신규 팩 없음. 사전 조건 편차: T2 FAIL이나 구조 검사 exit 0 팩 사용 |
 | T7 | PASS | 2026-09-08 | T7-transcript.md, T7-evolution.before.md, T7-evolution.after.md, T7-evolution-state.v2.bak.md, T7-evolution.diff | 승인 전 원문 유지·.bak 부재, 승인 후 백업·`--write`·v3 헤더 5키, 거부 덩어리 미기록. 관찰: lifecycle 수동 백업 후 스크립트가 'backup exists' exit 1(`--force` 필요) |
 | T8 | PASS | 2026-09-08 | T8-transcript.md, T8-manifest.json, T8-pack.md, T8-restore-check.txt | 조건부. 하네스가 에이전트 목록을 세션 시작 시 캐시해 정의 제거가 런타임 스폰 실패로 이어지지 않음. general-purpose 폴백은 테스터가 강제 실행 → 6절·해시 계약 통과. 정의 복원 sha 동일 |
-| T8 | PASS | 2026-09-26 | T8-rerun-transcript.md, T8-rerun-pack.md, T8-rerun-manifest.json, T8-rerun-restore-check.txt | 재실측(#8, 브랜치 docs-8-gates-rerun = main 65272b5). 정의를 치운 뒤 격리 `CLAUDE_CONFIG_DIR` 새 세션(auto 모드, 권한 프롬프트 0회). `smartthink:st-armorer` not found → bare `st-armorer` not found → general-purpose 폴백이 테스터 개입 없이 자동 발동, 게이트 비용 2단위(팩 ≈131K/서브 ≈144K), 팩 6절·manifest 11필드, `--pack` H 5/5 exit 0. 복원 후 sha256 동일. 관찰: 폴백 브리핑을 `git show HEAD:agents/st-armorer.md`로 복구해 만듦, general-purpose가 동기가 아닌 백그라운드로 뜸 |
+| T8 | PASS | 2026-09-26 | T8-rerun-transcript.md, T8-rerun-pack.md, T8-rerun-manifest.json, T8-rerun-restore-check.txt | 재실측(#8, 브랜치 docs-8-gates-rerun = main 65272b5). 정의를 치운 뒤 격리 `CLAUDE_CONFIG_DIR` 새 세션(auto 모드, 권한 프롬프트 0회). `smartthink:st-armorer` not found → bare `st-armorer` not found → general-purpose 폴백이 테스터 개입 없이 자동 발동, 게이트 비용 2단위(팩 ≈131K/서브 ≈144K), 팩 6절·manifest 11필드, `--pack` H 5/5 exit 0. 복원 후 sha256 동일. 관찰: 폴백 브리핑을 `git show HEAD:agents/st-armorer.md`로 복구해 만듦, general-purpose가 동기가 아닌 백그라운드로 뜸, manifest `created`가 23:30으로 실제 작성 시각(23:02~23:10)과 다름(스킬 결함, 보고만) |
 | T9 | PASS | 2026-09-08 | T9-settings.diff, T9-transcript.md, T9-prompt-observation.md | 조건부. 거절 시 settings 무변경, 승인 시 보존 머지로 `Edit(<VAULT>/**)` 1개 추가. 프롬프트 발생 여부는 bypass 모드라 관찰 불가 |
-| T9 | FAIL | 2026-09-26 | T9-rerun-prompt-observation.md, T9-rerun-settings.diff, T9-rerun-transcript.md, T9-rerun-failure.md | 재실측(#8, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`). 프롬프트 관찰은 성공: 규칙 없을 때 백그라운드 Write 프롬프트 뜸. 실패 기준: init이 설치한 `Edit(<VAULT>/**)`가 vault와 매칭되지 않아(새 세션에서도 프롬프트) "현재 vault를 가리키는 규칙" 불충족, `Edit(//<VAULT>/**)`로는 해소. 설치 대상이 `CLAUDE_CONFIG_DIR`을 무시하고 실제 `~/.claude/settings.json`을 향함(테스터가 거절·재지시). 거절 시 무변경·보존 머지·1항목 추가는 충족. 세션 1 첫 무장은 auto 모드 오염으로 판정 제외 |
+| T9 | FAIL | 2026-09-26~27 | T9-rerun-prompt-observation.md, T9-rerun-settings.diff, T9-rerun-transcript.md, T9-rerun-failure.md | 재실측(#8, 브랜치 docs-8-gates-rerun = main 65272b5, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`). 프롬프트 관찰은 성공: 규칙 없을 때 백그라운드 Write 프롬프트 뜸. 실패 기준: init이 설치한 `Edit(<VAULT>/**)`가 vault와 매칭되지 않아(새 세션에서도 프롬프트) "현재 vault를 가리키는 규칙" 불충족, `Edit(//<VAULT>/**)`로는 해소. 설치 대상이 `CLAUDE_CONFIG_DIR`을 무시하고 실제 `~/.claude/settings.json`을 향함(테스터가 거절·재지시). 거절 시 무변경·보존 머지·1항목 추가는 충족. 세션 1 첫 무장은 auto 모드 오염으로 판정 제외 |
 | T10 | PASS | 2026-09-08 | T10-transcript.md, T10-evolution.before.md, T10-evolution.after.md, T10-fallback-transcript.md, T10-fallback-evolution.diff | 피드백 SendMessage 동일 thinker 재개(도구 0회 in-context 개정), 확정 전 무변경, 확정 후 thinker Step 5(sessions 1→2). 폴백: 재개 직후 TaskStop으로 종료시킨 뒤 메인이 Step 5 직접 실행(sessions 2→3). 유휴 thinker는 TaskStop 불가·SendMessage 재개 가능 |
 | T11 | PASS | 2026-09-08 | T11-skills.txt, T11-transcript.md, T11-observation.md | 실제 호출 이름 `/smartthink:smartthink`. `/st`·`/smartthink`·`/smartthink:st`는 전역 v2로 감. agents 등록 필드 불필요 |
 | T11 | PASS | 2026-09-26 | T11-rerun-st.txt, T11-rerun-agents.txt | 재실측(#2 할 일 3, 3.0.1 설치 후, 실제 HOME 새 헤드리스 세션, `--model opus`, `SMARTTHINK_VAULT`=임시). bare `/st`가 v3 게이트(`━━ SmartThink 무장 게이트 ━━`, 비용 2단위: 팩 약 144K / 서브에이전트 약 157K)를 띄움. 에이전트 목록에 `st-searcher` 없음, bare `st-thinker`는 리포 v3 정의 심링크. resolver가 임시 env vault에 시드, 실제 기본 vault `find -newer` 비어 있음 |
 | T12 | PASS | 2026-09-08 | T12-output.txt, T12-manifest.json, T12-pack.md | run1(문서 원문)은 Not logged in exit 1(중첩 자식 인증). run2(`CLAUDE_CODE_OAUTH_TOKEN` 주입)에서 자동 진행·120K 상한·절삭 출력·턴 종료. 헤드리스도 `/st`가 v2를 먼저 열고 스스로 v3 재호출 |
 | T13 | BLOCKED | 2026-09-08 | T13-blocked.md | codex exec에서 `/smartthink` 미등록(자유 텍스트로 처리). cwd가 리포라 SKILL.md를 읽어 게이트만 출력, 인라인 안내문 없음, 팩 없음 |
-| T13 | BLOCKED | 2026-09-26 | T13-rerun-blocked.md, T13-rerun-transcript.md, T13-rerun-pack.md, T13-rerun-manifest.json | 재실측(#8, codex-cli 0.155.1, `~/.codex/skills/smartthink` 등록, 리포 밖 cwd). 스킬 진입은 `$smartthink`로 성공(`/smartthink`는 Unrecognized command), 게이트·팩(6절·11필드·`harness: "codex"`·H 5/5)·브리핑 후 턴 종료 충족. 그러나 이 Codex에는 `spawn_agent`가 있어 armorer 경로로 진행했고 인라인 안내문은 나오지 않음. `--disable multi_agent*`로도 도구가 남아 인라인 경로 관찰 불가. 첫 시도는 TUI 셸 env가 데몬 명령에 전달되지 않아 실제 기본 vault를 읽음(쓰기 없음, 즉시 중단) |
+| T13 | BLOCKED | 2026-09-26 | T13-rerun-blocked.md, T13-rerun-transcript.md, T13-rerun-pack.md, T13-rerun-manifest.json | 재실측(#8, 브랜치 docs-8-gates-rerun = main 65272b5, codex-cli 0.155.1, `~/.codex/skills/smartthink` 등록(메인 체크아웃을 가리킴, 이 브랜치와 같은 커밋), 리포 밖 cwd). 스킬 진입은 `$smartthink`로 성공(`/smartthink`는 Unrecognized command), 게이트·팩(6절·11필드·`harness: "codex"`·H 5/5)·브리핑 후 턴 종료 충족. 그러나 이 Codex에는 `spawn_agent`가 있어 armorer 경로로 진행했고 인라인 안내문은 나오지 않음. `--disable multi_agent*`로도 도구가 남아 인라인 경로 관찰 불가. 첫 시도는 TUI 셸 env가 데몬 명령에 전달되지 않아 실제 기본 vault를 읽음(쓰기 없음, 즉시 중단) |
 | T14 | BLOCKED | 2026-09-26 | T14-output.txt, T14-blocked.md | 격리 HOME에 권한 허용 규칙이 없어 `-p` 자식의 resolver 호출 8회가 전부 승인 대기로 거부, 팩 미생성. resolver 단위 출력 source=env, 실제 기본 vault `find -newer` 비어 있음. 자식이 /tmp·리포 안에 vault 즉흥 생성 시도(거부) → SKILL.md에 금지 명시. 복합 명령 호출은 절대경로 한 줄로 교체 |
