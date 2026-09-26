@@ -176,6 +176,15 @@ class AssemblePackTest(unittest.TestCase):
         self.assertEqual(other.returncode, 0, other.stderr)
         self.assertIs(json.loads(other.stdout)["permission_rule_effective"], False)
 
+    def test_pack_keeps_its_file_mode(self) -> None:
+        # Found in the T9 run: the rewritten pack.md came back 0600 instead of the mode the
+        # Write tool gave it.
+        pack = self.write_pack()
+        pack.chmod(0o644)
+        result = self.assemble("--pack-dir", str(self.pack_dir), "--modules", "core-engines.md")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(oct(pack.stat().st_mode & 0o777), oct(0o644))
+
 
 if __name__ == "__main__":
     unittest.main()

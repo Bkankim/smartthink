@@ -69,3 +69,11 @@
   E       AssertionError: 0 != 1 : PASS A. layout: required paths exist
   ```
 - green: `3 passed, 2 subtests passed`, 실제 리포 D절 마커 형식 검사 evidence에 `scripts/assemble-pack.py MODULE-BEGIN: <!-- MODULE-BEGIN: <file> sha256=<sha> -->` 등장
+
+## S4-6 조립 뒤에도 pack.md 파일 모드 유지 (T9 실측에서 발견: 0600으로 바뀜)
+- 테스트: `test_pack_keeps_its_file_mode`
+- red:
+  ```
+  E       AssertionError: '0o600' != '0o644'
+  ```
+- green: `6 passed, 3 subtests passed`
