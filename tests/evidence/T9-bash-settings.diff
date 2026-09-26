@@ -1,0 +1,7 @@
+--- settings.json (init 전, 격리 CLAUDE_CONFIG_DIR)
++++ settings.json (init 4절 승인 뒤)
+3a4,7
+>         "allow": [
+>             "Edit(//var/folders/[REDACTED]/T/<VAULT_DIR>/**)",
+>             "Bash(python3 <HOME>/workspace/smartthink-st-21-assemble-pack/scripts/assemble-pack.py *)"
+>         ],

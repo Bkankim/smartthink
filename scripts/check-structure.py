@@ -117,12 +117,13 @@ THINKER_SYNC_RULES = (
 # Same idea for the armorer: references/armorer-prompt.md is what general-purpose receives
 # when no st-armorer definition resolves. What is checked is a sync of key-instruction regexes
 # (plus the section titles and manifest fields elsewhere), not a full-body diff.
-# Its only substitution slots are the two Path Variables of the SKILL.md 5a Input block.
-ARMORER_PROMPT_VARS = {"SKILL_DIR", "VAULT"}
+# Its only substitution slots are the three Path Variables of the SKILL.md 5a Input block
+# ({SCRIPTS_DIR} since #21: the armorer calls assemble-pack.py by its absolute path).
+ARMORER_PROMPT_VARS = {"SKILL_DIR", "SCRIPTS_DIR", "VAULT"}
 ARMORER_SYNC_RULES = (
     ("returns only the manifest summary", r"manifest\s*요약만\s*\**\s*반환"),
     ("never returns the pack body", r"팩\s*본문\s*반환\s*금지"),
-    ("section 5 copied byte-for-byte with Bash", r"Bash로\s*바이트를\s*이어\s*붙여라"),
+    ("section 5 copied byte-for-byte by assemble-pack.py", r"assemble-pack\.py로\s*바이트를\s*이어\s*붙여라"),
     ("single Write to pack.md", r"pack\.md에\s*대한\s*Write는\s*한\s*번뿐"),
     ("research only after reading the references", r"레퍼런스를\s*먼저\s*읽은\s*뒤에\s*검색"),
     # Anchored to the body line "턴 예산 40턴." so the fallback preamble's "40턴을" cannot satisfy it.
@@ -969,7 +970,7 @@ def check_armorer_prompt_sync() -> Result:
     Without it the main session briefed general-purpose from `git show`, which a copy or
     plugin-cache install cannot do. This checks the definition's key instructions by the
     ARMORER_SYNC_RULES regexes (not a full-body diff) and that the fallback uses exactly the
-    two 5a Path Variables as substitution slots.
+    three 5a Path Variables as substitution slots.
     """
     definition = read_text(ARMORER_MD)
     fallback = read_text(ARMORER_PROMPT_MD)
@@ -1020,6 +1021,69 @@ def check_armorer_prompt_sync() -> Result:
     evidence.append("substitution variables: " + ", ".join(sorted(found)))
     return ok(f"all {len(ARMORER_SYNC_RULES)} sync rules hold on both sides", evidence)
 
+# Issue #21: section 5 used to be built with printf/cat redirections into the pack file, and each
+# of those Bash calls prompted even with the vault Edit rule installed. The only writer is now
+# scripts/assemble-pack.py, which one narrow Bash rule can allow. A leftover redirection
+# instruction would bring the prompts back and bypass the script's own path checks.
+ASSEMBLER_PY = REPO_ROOT / "scripts" / "assemble-pack.py"
+ASSEMBLER_CALL_RE = re.compile(r"python3 \{SCRIPTS_DIR\}/assemble-pack\.py --pack-dir ")
+# Any shell write that bypasses the script: printf/cat/echo with a > or >> redirect (heredoc
+# included), tee in any form, and mkdir -p for the pack directory.
+PACK_REDIRECT_RE = re.compile(r"^.*(?:\b(?:printf|cat|echo)\b[^\n]*>|\btee\b|\bmkdir\s+-p\b).*$", re.M)
+
+
+# SKILL.md carries the same rule for the inline path (final-review #9). Only that section is
+# scanned; its Write-only branch for harnesses without Bash has no redirection and stays allowed.
+INLINE_SECTION_TITLE = "## 5b단계: 인라인 경로"
+
+
+def _inline_section(text: str) -> str | None:
+    start = text.find(INLINE_SECTION_TITLE)
+    if start < 0:
+        return None
+    end = text.find("\n## ", start + len(INLINE_SECTION_TITLE))
+    return text[start : end if end >= 0 else len(text)]
+
+
+def check_armorer_assembles_with_script() -> Result:
+    """st-armorer.md, armorer-prompt.md and SKILL.md 5b build section 5 by calling assemble-pack.py only."""
+    problems: list[str] = []
+    evidence: list[str] = []
+    if not ASSEMBLER_PY.exists():
+        problems.append(f"{rel(ASSEMBLER_PY)} is missing; section 5 has no writer")
+    skill = read_text(SKILL_MD)
+    inline = _inline_section(skill) if skill is not None else None
+    if inline is None:
+        problems.append(f"{rel(SKILL_MD)} has no '{INLINE_SECTION_TITLE}' section to check")
+    for path, text in (
+        (ARMORER_MD, read_text(ARMORER_MD)),
+        (ARMORER_PROMPT_MD, read_text(ARMORER_PROMPT_MD)),
+        (SKILL_MD, inline),
+    ):
+        if text is None:
+            if path != SKILL_MD:
+                problems.append(f"{rel(path)} is missing or unreadable")
+            continue
+        # Line numbers are reported against the whole file, also for the SKILL.md section.
+        base = line_of(skill, skill.find(INLINE_SECTION_TITLE)) - 1 if path == SKILL_MD else 0
+        call = ASSEMBLER_CALL_RE.search(text)
+        if call is None:
+            problems.append(
+                f"{rel(path)} never calls `python3 {{SCRIPTS_DIR}}/assemble-pack.py --pack-dir ...`; "
+                "section 5 must be assembled by the script"
+            )
+        else:
+            evidence.append(f"{rel(path)}:{base + line_of(text, call.start())} calls assemble-pack.py")
+        for match in PACK_REDIRECT_RE.finditer(text):
+            problems.append(
+                f"{rel(path)}:{base + line_of(text, match.start())} writes the pack with a shell command "
+                f"({match.group(0).strip()[:60]}); use assemble-pack.py instead"
+            )
+    if problems:
+        return bad(f"{len(problems)} section 5 assembly problem(s)", problems)
+    return ok("definition, fallback and SKILL.md 5b assemble section 5 with assemble-pack.py only", evidence)
+
+
 # The three marker spellings pack section 5 is built from. analysis-method.md is the SSOT;
 # st-armorer.md needs its own copy because the armorer is told to read only Step 0.5 of that
 # file, so a format written down there alone is a format the pack writer never sees.
@@ -1031,6 +1095,9 @@ MARKER_KINDS = ("MODULE-BEGIN", "MODULE-END", "MODULE-DIGEST")
 MARKER_LINE_RE = re.compile(
     r"^[ \t>]*(?P<marker><!--\s*MODULE-(?:BEGIN|END|DIGEST)\b.*?-->)[ \t]*$", re.M
 )
+
+# The script's templates are Python string literals such as "<!-- MODULE-END: {name} -->".
+ASSEMBLER_MARKER_RE = re.compile(r"[\"'](?P<marker><!--\s*MODULE-(?:BEGIN|END|DIGEST)\b[^\"'\n]*?-->)[\"']")
 
 
 def _marker_shape(marker: str) -> str:
@@ -1097,6 +1164,30 @@ def check_module_marker_forms() -> Result:
                 )
                 continue
             evidence.append(f"{rel(path)} {kind}: {sorted(agreed)[0]}")
+
+    # Since #21 the section 5 markers are written by assemble-pack.py, not by a printf template in
+    # the definition (the blind spot of #19). Its templates are string literals, so they are read
+    # as such; it writes verbatim packs only, hence BEGIN and END but no DIGEST.
+    source = read_text(ASSEMBLER_PY)
+    if source is None:
+        problems.append(f"{rel(ASSEMBLER_PY)} is missing or unreadable")
+    else:
+        templates: dict[str, set[str]] = {kind: set() for kind in MARKER_KINDS}
+        for match in ASSEMBLER_MARKER_RE.finditer(source):
+            marker = match.group("marker")
+            kind = next(kind for kind in MARKER_KINDS if kind in marker)
+            templates[kind].add(_marker_shape(marker))
+        for kind in ("MODULE-BEGIN", "MODULE-END"):
+            written, canonical = templates[kind], in_canon[kind]
+            if not written:
+                problems.append(f"{rel(ASSEMBLER_PY)} has no {kind} marker template")
+            elif canonical and written != written & canonical:
+                problems.append(
+                    f"{kind} format drifted: {rel(ASSEMBLER_PY)} writes {sorted(written)} but "
+                    f"{rel(ANALYSIS_METHOD_MD)} writes {sorted(canonical)}"
+                )
+            elif canonical:
+                evidence.append(f"{rel(ASSEMBLER_PY)} {kind}: {sorted(written)[0]}")
 
     if problems:
         return bad(f"{len(problems)} module marker form problem(s)", problems)
@@ -1840,6 +1931,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("D", "wiring: st-thinker definition and fallback prompt in sync", check_thinker_prompt_sync),
     ("D", "wiring: thinker-prompt substitution variables", check_thinker_prompt_variables),
     ("D", "wiring: st-armorer definition and fallback prompt in sync", check_armorer_prompt_sync),
+    ("D", "wiring: st-armorer assembles section 5 with assemble-pack.py", check_armorer_assembles_with_script),
     ("D", "wiring: section 5 module marker forms match the SSOT", check_module_marker_forms),
     ("D", "wiring: headless gate signals and branches", check_headless_gate_branch),
     ("E", "schema: evolution-state.md v3 header", check_evolution_state_schema),
