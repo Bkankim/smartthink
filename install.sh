@@ -55,7 +55,7 @@ fi
 # 0. Leftovers from a copy install (real files instead of symlinks) shadow the bare names and
 # block the links below. scripts/legacy-install.py recognizes them by content; they are moved to
 # a backup, never deleted, and only when asked.
-if ! LEFTOVERS="$(python3 "$LEGACY" detect)"; then
+if ! LEFTOVERS="$(python3 "$LEGACY" detect --blocking)"; then
   echo "ERROR: could not check for leftovers of an earlier install (see the message above). Nothing was changed."
   exit 1
 fi
@@ -68,24 +68,23 @@ if [ -n "$LEFTOVERS" ]; then
     echo "  ./install.sh --migrate-legacy"
     exit 1
   fi
-  echo "Moving leftovers of an earlier install to a backup:"
-  if ! MOVED="$(python3 "$LEGACY" migrate)"; then
-    echo "ERROR: moving the leftovers failed (see the message above). Check ~/.claude/.backup/ before re-running."
-    exit 1
-  fi
-  printf '%s\n' "$MOVED" | sed 's/^/  /'
-  echo ""
 fi
 
-# 1. Preflight: every target is checked before anything changes, so a blocked target can
-# never leave a half-finished install behind.
+# A detected leftover is about to be moved, so it does not block its target.
+is_leftover() {
+  # No pipe into grep -q: under pipefail an early grep exit can fail the writer with SIGPIPE.
+  [ -n "$LEFTOVERS" ] && grep -qxF "$1" <<<"$(cut -f1 <<<"$LEFTOVERS")"
+}
+
+# 1. Preflight: every target is checked before anything changes (leftovers are moved only
+# after it passes), so a blocked target can never leave a half-finished install behind.
 BLOCKED=()
-if [ -e "$SKILL_TARGET" ] && [ ! -L "$SKILL_TARGET" ]; then
+if [ -e "$SKILL_TARGET" ] && [ ! -L "$SKILL_TARGET" ] && ! is_leftover "$SKILL_TARGET"; then
   BLOCKED+=("$SKILL_TARGET exists as a directory (not a symlink)")
 fi
 for f in "${AGENT_FILES[@]}"; do
   target="$AGENTS_TARGET/$f"
-  if [ -e "$target" ] && [ ! -L "$target" ]; then
+  if [ -e "$target" ] && [ ! -L "$target" ] && ! is_leftover "$target"; then
     BLOCKED+=("$target exists as a regular file (not a symlink)")
   fi
 done
@@ -103,11 +102,35 @@ fi
 # the install (the skill still opens as /smartthink), but say so before anything changes.
 for f in "${COMMAND_FILES[@]}"; do
   target="$COMMANDS_TARGET/$f"
-  if [ -e "$target" ] && [ ! -L "$target" ]; then
+  if [ -e "$target" ] && [ ! -L "$target" ] && ! is_leftover "$target"; then
     echo "WARNING: $target exists as a regular file and will be left alone."
     echo "         The /st alias will not be installed; use /smartthink instead."
   fi
 done
+
+# Vault, prepared before any link is created so an unwritable vault stops the install
+# cleanly. It lives OUTSIDE the repo so your profile and insights never get committed.
+# scripts/resolve-vault.py owns the path rules and the seeding; this script only reports.
+# profile.md is intentionally NOT seeded: its absence is the signal that tells SmartThink to
+# suggest /st init, which is what actually fills the profile in.
+if ! VAULT_JSON="$(python3 "$RESOLVER" --ensure)"; then
+  echo "ERROR: could not prepare the vault (see the message above)."
+  exit 1
+fi
+VAULT="$(printf '%s' "$VAULT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["path"])')"
+VAULT_SOURCE="$(printf '%s' "$VAULT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["source"])')"
+echo "Vault          : $VAULT (from $VAULT_SOURCE)"
+echo "Packs dir      : $VAULT/packs"
+
+if [ -n "$LEFTOVERS" ]; then
+  echo "Moving leftovers of an earlier install to a backup:"
+  if ! MOVED="$(python3 "$LEGACY" migrate --blocking)"; then
+    echo "ERROR: moving the leftovers failed (see the message above). Check ~/.claude/.backup/ before re-running."
+    exit 1
+  fi
+  printf '%s\n' "$MOVED" | sed 's/^/  /'
+  echo ""
+fi
 
 mkdir -p "$HOME/.claude/skills" "$AGENTS_TARGET" "$COMMANDS_TARGET"
 
@@ -154,19 +177,6 @@ for f in "${COMMAND_FILES[@]}"; do
   ln -s "$COMMANDS_SOURCE/$f" "$target"
   echo "Command linked : $target -> $COMMANDS_SOURCE/$f"
 done
-
-# 5. Vault (lives OUTSIDE the repo so your profile and insights never get committed).
-# scripts/resolve-vault.py owns the path rules and the seeding; this script only reports.
-# profile.md is intentionally NOT seeded: its absence is the signal that tells SmartThink to
-# suggest /st init, which is what actually fills the profile in.
-if ! VAULT_JSON="$(python3 "$RESOLVER" --ensure)"; then
-  echo "ERROR: could not prepare the vault (see the message above)."
-  exit 1
-fi
-VAULT="$(printf '%s' "$VAULT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["path"])')"
-VAULT_SOURCE="$(printf '%s' "$VAULT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["source"])')"
-echo "Vault          : $VAULT (from $VAULT_SOURCE)"
-echo "Packs dir      : $VAULT/packs"
 
 echo ""
 echo "Installation complete!"
