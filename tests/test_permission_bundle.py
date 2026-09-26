@@ -38,7 +38,9 @@ class PermissionBundleTest(unittest.TestCase):
         (plugin_root / "scripts").mkdir(parents=True)
         for name in SCRIPTS:
             (plugin_root / "scripts" / name).write_bytes((REPO_ROOT / "scripts" / name).read_bytes())
-        (plugin_root / "skills" / "smartthink").mkdir(parents=True)
+        (plugin_root / "skills" / "smartthink" / ".data").mkdir(parents=True)
+        seed = REPO_ROOT / "skills" / "smartthink" / ".data" / "evolution-state.md"
+        (plugin_root / "skills" / "smartthink" / ".data" / "evolution-state.md").write_bytes(seed.read_bytes())
 
     def bundle(self, scripts_dir: Path, **extra: str) -> dict:
         env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
@@ -53,6 +55,30 @@ class PermissionBundleTest(unittest.TestCase):
         )
         self.assertEqual(completed.returncode, 0, completed.stderr)
         return json.loads(completed.stdout)
+
+    def run_resolver(self, scripts_dir: Path, *args: str, **extra: str) -> dict:
+        env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
+        env.update(HOME=str(self.home), SMARTTHINK_VAULT=str(self.vault), **extra)
+        completed = subprocess.run(
+            [sys.executable, str(scripts_dir / "resolve-vault.py"), *args],
+            env=env, cwd=self.root, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        return json.loads(completed.stdout)
+
+    def test_bash_rules_effective_is_reported_by_ensure_and_permission_rule(self) -> None:
+        # final-review 20260927-073516 #1: the session decides whether to quote {SCRIPTS_DIR} from
+        # this field, and arming only runs --ensure, so both outputs carry it with the reason.
+        self.install_copy(self.root / "safe")
+        self.install_copy(self.root / "with space")
+        for option in ("--ensure", "--permission-rule"):
+            with self.subTest(option=option):
+                safe = self.run_resolver(self.root / "safe" / "scripts", option)
+                self.assertIs(safe["bash_rules_effective"], True)
+                self.assertIsNone(safe["bash_rules_reason"])
+                spaced = self.run_resolver(self.root / "with space" / "scripts", option)
+                self.assertIs(spaced["bash_rules_effective"], False)
+                self.assertEqual(spaced["bash_rules_reason"], "special-characters")
 
     def test_bash_rules_use_the_invoked_scripts_dir_under_a_symlinked_ancestor(self) -> None:
         # Same reason as assemble-pack (final-review #7 of #21): the session types
@@ -120,6 +146,22 @@ class PermissionBundleTest(unittest.TestCase):
             ],
         )
 
+    def test_read_rule_effective_covers_the_link_paths(self) -> None:
+        # final-review 20260927-073516 #3: a clean checkout linked from a config dir whose path has
+        # rule syntax gives a read rule that never matches, so the whole Read bundle is not effective.
+        self.install_copy(self.root / "checkout")
+        skill = self.root / "checkout" / "skills" / "smartthink"
+        config = self.root / "claude[work]"
+        (config / "skills").mkdir(parents=True)
+        (config / "skills" / "smartthink").symlink_to(skill)
+
+        clean = self.bundle(self.root / "checkout" / "scripts")
+        linked = self.bundle(self.root / "checkout" / "scripts", CLAUDE_CONFIG_DIR=str(config))
+
+        self.assertIs(clean["read_rule_effective"], True)
+        self.assertEqual(len(linked["read_rules"]), 2)
+        self.assertIs(linked["read_rule_effective"], False)
+
     def test_read_rules_for_a_plugin_install_hold_only_the_skill_dir(self) -> None:
         self.install_copy(self.root / "plugin")
         result = self.bundle(self.root / "plugin" / "scripts")
@@ -153,6 +195,28 @@ class PermissionBundleTest(unittest.TestCase):
         self.vault = Path("rel") / "vault"
         self.assertIs(self.bundle(scripts)["vault_writable"], True)
 
+    def test_ensure_reports_vault_writable_for_the_root_and_packs(self) -> None:
+        # final-review 20260927-073516 #2: --ensure exits 0 on a read-only vault, so the arming
+        # gate reads this field. The armorer writes under packs/, so a read-only packs/ is not
+        # writable either.
+        self.install_copy(self.root / "plugin")
+        scripts = self.root / "plugin" / "scripts"
+        self.vault = self.root / "vault"
+        self.assertIs(self.run_resolver(scripts, "--ensure")["vault_writable"], True)
+        packs = self.vault / "packs"
+        packs.chmod(0o555)
+        try:
+            for option in ("--ensure", "--permission-rule"):
+                with self.subTest(option=option):
+                    self.assertIs(self.run_resolver(scripts, option)["vault_writable"], False)
+        finally:
+            packs.chmod(0o755)
+        self.vault.chmod(0o555)
+        try:
+            self.assertIs(self.run_resolver(scripts, "--ensure")["vault_writable"], False)
+        finally:
+            self.vault.chmod(0o755)
+
     def test_module_sizes_replace_the_wc_fallback(self) -> None:
         # final-review 20260927-064432 (a)1: without index.json the gate measured module sizes with
         # Bash `wc -c`, a command outside the rule bundle. The resolver, already allowed, reports them.
@@ -180,11 +244,18 @@ class PermissionBundleTest(unittest.TestCase):
                 "meta-cognition.md": {"bytes": 100, "est_tokens": 45},
             }},
         )
+        # final-review 20260927-073516 #5: one bad name must not cost the gate every estimate. It
+        # comes back as null with a warning, the others are measured, and the exit code stays 0.
+        # A path is never followed outside references/.
         for bad in ("../scripts/resolve-vault.py", "missing.md"):
             with self.subTest(name=bad):
-                refused = run(bad)
-                self.assertNotEqual(refused.returncode, 0, refused.stdout)
-                self.assertEqual(refused.stdout, "")
+                mixed = run("core-engines.md", bad)
+                self.assertEqual(mixed.returncode, 0, mixed.stderr)
+                self.assertEqual(
+                    json.loads(mixed.stdout),
+                    {"modules": {"core-engines.md": {"bytes": 22, "est_tokens": 10}, bad: None}},
+                )
+                self.assertIn(bad, mixed.stderr)
 
     def test_every_documented_script_call_starts_with_its_rule_prefix(self) -> None:
         # The rule only helps if the command a doc shows, with {SCRIPTS_DIR} filled in, starts with
