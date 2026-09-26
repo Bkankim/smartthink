@@ -184,19 +184,27 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 ### T8. armorer 정의 제거 폴백
 
 - **목적**: `st-armorer` 정의가 없을 때 general-purpose 폴백 또는 인라인 경로가 명시된 비용 표기로 동작하는지 확인한다.
-- **사전 조건**: T1 PASS, 다른 작업자가 같은 리포지터리를 사용하지 않는 시간, Agent 도구가 있는 세션이다. 먼저 `test -f agents/st-armorer.md`와 `shasum -a 256 agents/st-armorer.md`로 원본 존재와 해시를 기록한다.
+- **사전 조건**: T1 PASS, Agent 도구가 있는 세션이다. 변형은 둘이다: **기본 변형**(리포의 정의를 잠시 옮김)과 **git 없는 변형**(정의·`.git`을 뺀 사본, #15 이후 권장). 기본 변형은 다른 작업자가 같은 리포지터리를 사용하지 않는 시간에 하고, 먼저 `test -f agents/st-armorer.md`와 `shasum -a 256 agents/st-armorer.md`로 원본 존재와 해시를 기록한다. git 없는 변형은 리포를 건드리지 않으므로 이 기록이 필요 없다.
   - **정의를 치운 뒤 새 세션을 시작해야 한다.** 하네스는 에이전트 목록을 세션 시작 시 캐시하므로, 이미 열린 세션에서 파일을 옮기면 캐시된 정의가 그대로 스폰되어 폴백이 일어나지 않는다.
   - **2절의 격리 설정 세션에서 연다.** 사용자 레벨 `~/.claude/agents/st-armorer.md` 같은 bare 정의가 있으면 `smartthink:st-armorer` 실패 뒤 bare 재시도가 성공해 폴백이 드러나지 않는다. 권한 관찰이 목적이 아니므로 권한 모드는 auto 또는 `--dangerously-skip-permissions`여도 되며, 쓴 모드를 기록한다.
   - 플러그인 이름공간 호출 `/smartthink:smartthink`를 쓴다. 격리 설정에는 bare `/st` 별칭이 없다.
-- **입력**: 터미널에서 `mv agents/st-armorer.md "${TMPDIR:-/tmp}/st-armorer.md.gates"`를 실행하고 `ls agents/`로 부재를 확인한 **뒤** 격리 설정 세션을 새로 시작해 `/smartthink:smartthink 지역 박물관의 안내 표지 체계를 개선해줘`를 입력한다. 게이트에서 진행한다. 테스트 직후 `mv "${TMPDIR:-/tmp}/st-armorer.md.gates" agents/st-armorer.md`로 반드시 복원하고 해시를 다시 확인한다.
+  - git 없는 변형은 폴백이 git 이력에 기대는지 드러낸다. 원본을 건드리지 않으므로 복원 단계가 없고, 테스트 뒤 사본을 지우면 끝난다.
+- **입력**: 어느 변형이든 정의를 치운 **뒤** 격리 설정 세션을 새로 시작해 `/smartthink:smartthink <주제>`(예: `지역 박물관의 안내 표지 체계를 개선해줘`)를 입력하고 게이트에서 진행한다.
+  - 기본 변형: 터미널에서 `mv agents/st-armorer.md "${TMPDIR:-/tmp}/st-armorer.md.gates"`를 실행하고 `ls agents/`로 부재를 확인한 뒤 `--plugin-dir "$WT"`로 연다. 테스트 직후 `mv "${TMPDIR:-/tmp}/st-armorer.md.gates" agents/st-armorer.md`로 반드시 복원하고 해시를 다시 확인한다.
+  - git 없는 변형: `cp -R "$WT" <임시>/plugin && rm -rf <임시>/plugin/.git && rm <임시>/plugin/agents/st-armorer.md`로 사본을 만들고 `ls <임시>/plugin/agents`로 부재를 확인한 뒤, git이 아닌 작업 디렉터리에서 `--plugin-dir <임시>/plugin`으로 연다. 증거 추출 뒤 `rm -rf <임시>`로 사본을 지운다.
 - **통과 기준**:
   - 게이트가 정상 표시되고 일반 경로와 같은 두 단위 예상 비용을 표시한다.
   - `st-armorer` 정의 없음이 관찰 가능하게 기록된다: `smartthink:st-armorer` not found, 이어서 bare `st-armorer` not found가 스폰 결과로 보인다.
   - 테스터 개입 없이 general-purpose armorer 폴백이 자동 발동하고, 성공하면 팩 한 쌍과 브리핑이 생성된다. `python3 scripts/check-structure.py --pack <팩 디렉터리>`의 `pack:` 줄이 5 passed다.
+  - 폴백 브리핑은 `references/armorer-prompt.md`에서 온다: 메인이 그 파일을 Read하고, general-purpose prompt가 그 전문에 Input 블록을 붙인 것이다. `git show` 등 git 이력 사용은 메인·서브에이전트 모두 0회다(세션 jsonl의 Bash 명령으로 센다).
+  - armorer가 백그라운드로 뜨면(Agent 도구에 `run_in_background`가 없는 하네스, 2.1.283은 항상) SKILL.md 5a 대기 규칙을 지킨다: 스폰부터 완료 알림까지 메인 출력은 1줄 상태 고지뿐이고 팩 Read·브리핑 출력·추측이 없으며, 첫 팩 접근은 알림 뒤다.
   - general-purpose 폴백도 실패하면 인라인 경로로 내려가며 게이트에 `이 환경에는 Agent 도구가 없어 리서치를 메인이 직접 수행합니다.`와 검색 원문이 메인 컨텍스트를 소모한다는 안내가 표시된다.
-  - 어떤 경로든 팩을 만들었다면 절 구조와 manifest 계약을 지키고, 테스트 후 `agents/st-armorer.md`가 원래 위치로 복원되어 있다.
-- **증거**: `T8-transcript.md`, 생성되었다면 `T8-manifest.json`과 `T8-pack.md`, `T8-restore-check.txt`를 남긴다. 마지막 파일에는 복원 확인 명령과 결과를 남긴다.
-- **실패 시 흔한 원인**: 에이전트 정의를 복원하지 않음, 폴백 실패 후 인라인 경로로 전환하지 않음, 인라인 리서치 비용 안내가 누락됨.
+  - 어떤 경로든 팩을 만들었다면 절 구조와 manifest 계약을 지킨다.
+  - 기본 변형: 테스트 후 `agents/st-armorer.md`가 원래 위치로 복원되고 해시가 같다. git 없는 변형: 리포의 `agents/st-armorer.md`는 처음부터 건드리지 않으며, 사본이 삭제되어 있다.
+- **증거**: 파일명은 회차 접두어(`T8-`, `T8-rerun-`, `T8-fix-` 등)를 붙인다. 공통으로 `<접두어>transcript.md`, 생성되었다면 `<접두어>manifest.json`과 `<접두어>pack.md`를 남긴다.
+  - 기본 변형: `<접두어>restore-check.txt`에 복원 확인 명령과 결과(전후 `ls`·`shasum`)를 남긴다.
+  - git 없는 변형: restore-check 대신 transcript의 실행 조건에 사본 경로(`<임시>/plugin` 형태로 치환), 사본 생성 명령, `.git`·정의 부재 확인, 사본 삭제 사실을 기록한다.
+- **실패 시 흔한 원인**: 에이전트 정의를 복원하지 않음, 폴백 실패 후 인라인 경로로 전환하지 않음, 인라인 리서치 비용 안내가 누락됨, 폴백 브리핑을 git 이력에서 복구함, 백그라운드 완료 알림 전에 브리핑을 출력함.
 
 ### T9. 백그라운드 Write 권한
 
@@ -325,6 +333,7 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 | T7 | PASS | 2026-09-08 | T7-transcript.md, T7-evolution.before.md, T7-evolution.after.md, T7-evolution-state.v2.bak.md, T7-evolution.diff | 승인 전 원문 유지·.bak 부재, 승인 후 백업·`--write`·v3 헤더 5키, 거부 덩어리 미기록. 관찰: lifecycle 수동 백업 후 스크립트가 'backup exists' exit 1(`--force` 필요) |
 | T8 | PASS | 2026-09-08 | T8-transcript.md, T8-manifest.json, T8-pack.md, T8-restore-check.txt | 조건부. 하네스가 에이전트 목록을 세션 시작 시 캐시해 정의 제거가 런타임 스폰 실패로 이어지지 않음. general-purpose 폴백은 테스터가 강제 실행 → 6절·해시 계약 통과. 정의 복원 sha 동일 |
 | T8 | PASS | 2026-09-26 | T8-rerun-transcript.md, T8-rerun-pack.md, T8-rerun-manifest.json, T8-rerun-restore-check.txt | 재실측(#8, 브랜치 docs-8-gates-rerun = main 65272b5). 정의를 치운 뒤 격리 `CLAUDE_CONFIG_DIR` 새 세션(auto 모드, 권한 프롬프트 0회). `smartthink:st-armorer` not found → bare `st-armorer` not found → general-purpose 폴백이 테스터 개입 없이 자동 발동, 게이트 비용 2단위(팩 ≈131K/서브 ≈144K), 팩 6절·manifest 11필드, `--pack` H 5/5 exit 0. 복원 후 sha256 동일. 관찰: 폴백 브리핑을 `git show HEAD:agents/st-armorer.md`로 복구해 만듦, general-purpose가 동기가 아닌 백그라운드로 뜸, manifest `created`가 23:30으로 실제 작성 시각(23:02~23:10)과 다름(스킬 결함, 보고만) |
+| T8 | PASS | 2026-09-27 | T8-fix-transcript.md, T8-fix-probe.md, T8-fix-pack.md, T8-fix-manifest.json, T8-fix-structure-check.txt | 재실측(#15, 브랜치 st-15-armorer-fallback f1ff5bc). git 없는 변형: `.git`과 `agents/st-armorer.md`를 뺀 사본(`<TMP>/plugin`, 생성·부재 확인·삭제는 T8-fix-transcript.md 실행 조건, restore-check 해당 없음) + 격리 `CLAUDE_CONFIG_DIR`, `--dangerously-skip-permissions`. `smartthink:st-armorer` → bare 둘 다 not found → 메인이 `references/armorer-prompt.md` Read → general-purpose(prompt = 파일 전문 + Input 블록). git 호출 메인 0·서브 0. 백그라운드 스폰(프로브: 2.1.283 Agent 스키마에 `run_in_background` 없음, 정식 armorer도 백그라운드) → 대기 중 1줄 고지만, 완료 알림 16:03:42 뒤 16:03:46 첫 팩 접근. 팩 6절·manifest 11필드, `--pack` 워크트리 검사기 exit 0(pack 5/5) |
 | T9 | PASS | 2026-09-08 | T9-settings.diff, T9-transcript.md, T9-prompt-observation.md | 조건부. 거절 시 settings 무변경, 승인 시 보존 머지로 `Edit(<VAULT>/**)` 1개 추가. 프롬프트 발생 여부는 bypass 모드라 관찰 불가 |
 | T9 | FAIL | 2026-09-26~27 | T9-rerun-prompt-observation.md, T9-rerun-settings.diff, T9-rerun-transcript.md, T9-rerun-failure.md | 재실측(#8, 브랜치 docs-8-gates-rerun = main 65272b5, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`). 프롬프트 관찰은 성공: 규칙 없을 때 백그라운드 Write 프롬프트 뜸. 실패 기준: init이 설치한 `Edit(<VAULT>/**)`가 vault와 매칭되지 않아(새 세션에서도 프롬프트) "현재 vault를 가리키는 규칙" 불충족, `Edit(//<VAULT>/**)`로는 해소. 설치 대상이 `CLAUDE_CONFIG_DIR`을 무시하고 실제 `~/.claude/settings.json`을 향함(테스터가 거절·재지시). 거절 시 무변경·보존 머지·1항목 추가는 충족. 세션 1 첫 무장은 auto 모드 오염으로 판정 제외 |
 | T10 | PASS | 2026-09-08 | T10-transcript.md, T10-evolution.before.md, T10-evolution.after.md, T10-fallback-transcript.md, T10-fallback-evolution.diff | 피드백 SendMessage 동일 thinker 재개(도구 0회 in-context 개정), 확정 전 무변경, 확정 후 thinker Step 5(sessions 1→2). 폴백: 재개 직후 TaskStop으로 종료시킨 뒤 메인이 Step 5 직접 실행(sessions 2→3). 유휴 thinker는 TaskStop 불가·SendMessage 재개 가능 |

@@ -1,0 +1,44 @@
+PASS A. layout: required paths exist
+PASS A. layout: plugin.json is valid and complete
+PASS A. layout: st-searcher.md removed
+PASS A. layout: st-armorer.md and st-thinker.md exist
+PASS B. references: 9 mental-model modules exist
+PASS B. references: index.json sha256 matches file bytes
+PASS B. references: index.json est_tokens recomputes
+PASS C. agents: frontmatter parses and name matches filename
+PASS C. agents: no model field (session inheritance)
+PASS C. agents: no skills preload
+PASS C. agents: st-thinker effort/maxTurns
+PASS C. agents: st-armorer effort/maxTurns
+PASS C. agents: st-armorer owns the web tools
+PASS C. agents: st-thinker has no web tools
+PASS D. wiring: 6 pack section titles shared verbatim
+PASS D. wiring: 11 manifest fields described on both sides
+PASS D. wiring: spawned sub-agent names resolve to agents/
+PASS D. wiring: plugin namespace on spawns and the /st alias
+PASS D. wiring: referenced references/ files exist
+PASS D. wiring: st-thinker definition and fallback prompt in sync
+PASS D. wiring: thinker-prompt substitution variables
+PASS D. wiring: st-armorer definition and fallback prompt in sync
+PASS D. wiring: section 5 module marker forms match the SSOT
+PASS D. wiring: headless gate signals and branches
+PASS E. schema: evolution-state.md v3 header
+PASS E. schema: profile.md v3 header
+PASS E. schema: profile.md six blocks in order
+PASS E. schema: shipped .data is a blank seed
+PASS E. vault: {VAULT} comes from resolve-vault.py
+PASS F. v2: no --deep mode in SKILL.md
+PASS F. v2: SKILL.md frontmatter has no effort/argument-hint
+PASS F. v2: no legacy prefix alias mapping
+PASS F. v2: no live st-searcher wiring
+PASS G. hygiene: no em dash in editable files
+PASS G. hygiene: no private information
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+
+40 passed, 0 failed, 0 skipped
+pack: 5 passed, 0 failed, 0 skipped
+exit=0
