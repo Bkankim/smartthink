@@ -136,10 +136,13 @@ def permission_rule() -> dict:
 
 
 def write_atomically(path: Path, data: bytes) -> None:
+    mode = path.stat().st_mode & 0o7777
     handle, temp = tempfile.mkstemp(dir=path.parent, prefix=".pack-", suffix=".tmp")
     try:
         with os.fdopen(handle, "wb") as stream:
             stream.write(data)
+        # mkstemp creates 0600; keep the mode the Write tool gave pack.md.
+        os.chmod(temp, mode)
         os.replace(temp, path)
     except BaseException:
         Path(temp).unlink(missing_ok=True)
