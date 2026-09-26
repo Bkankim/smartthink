@@ -5,6 +5,7 @@ Every case runs against a throwaway HOME so the real ~/.claude is never read or 
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -12,6 +13,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 INSTALL = REPO_ROOT / "install.sh"
+LEGACY = REPO_ROOT / "scripts" / "legacy-install.py"
 UNINSTALL = REPO_ROOT / "uninstall.sh"
 
 V2_SKILL_MD = "---\nname: smartthink\n---\n# SmartThink v2\nst-thinker를 스폰한다.\n"
@@ -47,6 +49,28 @@ class InstallerTestCase(unittest.TestCase):
         (self.claude / "agents" / "st-thinker.md").write_text(V2_THINKER, encoding="utf-8")
         (self.claude / "agents" / "st-searcher.md").write_text(V2_SEARCHER, encoding="utf-8")
         (self.claude / "commands" / "st.md").write_text(V2_ALIAS, encoding="utf-8")
+
+    def plant_old_checkout_links(self) -> Path:
+        # A v2 symlink install made from another clone that is still on v2.
+        old = self.home / "old-clone"
+        (old / "skills" / "smartthink").mkdir(parents=True)
+        (old / "skills" / "smartthink" / "SKILL.md").write_text(V2_SKILL_MD, encoding="utf-8")
+        (old / "agents").mkdir()
+        (old / "agents" / "st-thinker.md").write_text(V2_THINKER, encoding="utf-8")
+        (old / "commands").mkdir()
+        (old / "commands" / "st.md").write_text(V2_ALIAS, encoding="utf-8")
+        (self.claude / "skills" / "smartthink").symlink_to(old / "skills" / "smartthink")
+        (self.claude / "agents" / "st-thinker.md").symlink_to(old / "agents" / "st-thinker.md")
+        (self.claude / "commands" / "st.md").symlink_to(old / "commands" / "st.md")
+        return old
+
+    def detect(self) -> str:
+        env = {key: value for key, value in os.environ.items() if key != "SMARTTHINK_VAULT"}
+        env["HOME"] = str(self.home)
+        completed = subprocess.run(
+            ["python3", str(LEGACY), "detect"], env=env, capture_output=True, text=True, check=True
+        )
+        return completed.stdout
 
     def backups(self) -> list[Path]:
         root = self.claude / ".backup"
@@ -140,6 +164,54 @@ class InstallTest(InstallerTestCase):
         self.assertEqual(self.backups(), [])
 
 
+    def test_old_checkout_links_are_reported_for_status(self) -> None:
+        self.plant_old_checkout_links()
+
+        report = self.detect()
+
+        self.assertIn("skills/smartthink", report)
+        self.assertIn("agents/st-thinker.md", report)
+        self.assertIn("commands/st.md", report)
+
+    def test_old_checkout_links_are_replaced_without_the_flag(self) -> None:
+        old = self.plant_old_checkout_links()
+
+        completed = self.run_script(INSTALL)
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assert_linked_to_repo()
+        self.assertTrue((old / "skills" / "smartthink" / "SKILL.md").is_file())
+        self.assertEqual(self.backups(), [])
+
+    def test_blocked_target_moves_nothing_even_with_the_flag(self) -> None:
+        self.plant_copy_install()
+        own = "---\nname: st-armorer\n---\nsomeone else's agent\n"
+        (self.claude / "agents" / "st-armorer.md").write_text(own, encoding="utf-8")
+
+        completed = self.run_script(INSTALL, "--migrate-legacy")
+
+        self.assertEqual(completed.returncode, 1, completed.stdout)
+        self.assertEqual(self.backups(), [])
+        self.assertEqual((self.claude / "agents" / "st-searcher.md").read_text(encoding="utf-8"), V2_SEARCHER)
+
+    def test_unwritable_vault_stops_before_any_link(self) -> None:
+        blocker = self.home / "not-a-dir"
+        blocker.write_text("file, not a directory\n", encoding="utf-8")
+        env = {key: value for key, value in os.environ.items()}
+        env["HOME"] = str(self.home)
+        env["SMARTTHINK_VAULT"] = str(blocker / "vault")
+
+        completed = subprocess.run(["bash", str(INSTALL)], env=env, capture_output=True, text=True, check=False)
+
+        self.assertEqual(completed.returncode, 1, completed.stdout)
+        self.assertFalse(os.path.lexists(self.claude / "skills" / "smartthink"))
+
+    def test_current_alias_copy_is_not_a_leftover(self) -> None:
+        (self.claude / "commands" / "st.md").write_bytes((REPO_ROOT / "commands" / "st.md").read_bytes())
+
+        self.assertEqual(self.detect(), "")
+
+
 class UninstallTest(InstallerTestCase):
     def test_leftovers_stop_uninstall_without_changes(self) -> None:
         self.plant_copy_install()
@@ -161,6 +233,44 @@ class UninstallTest(InstallerTestCase):
         self.assertFalse((self.claude / "agents" / "st-searcher.md").exists())
         [backup] = self.backups()
         self.assertTrue((backup / "commands" / "st.md").is_file())
+
+
+    def test_old_checkout_links_are_removed_without_the_flag(self) -> None:
+        self.plant_old_checkout_links()
+
+        completed = self.run_script(UNINSTALL)
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertFalse(os.path.lexists(self.claude / "skills" / "smartthink"))
+        self.assertFalse(os.path.lexists(self.claude / "commands" / "st.md"))
+
+    def test_stale_pointer_is_mentioned(self) -> None:
+        vault_dir = self.claude / "smartthink-vault"
+        vault_dir.mkdir()
+        (vault_dir / "vault-pointer").write_text(str(self.home / "notes") + "\n", encoding="utf-8")
+
+        completed = self.run_script(UNINSTALL)
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("vault-pointer", completed.stdout)
+
+    def test_uninstall_removes_links_without_python(self) -> None:
+        (self.claude / "skills" / "smartthink").symlink_to(REPO_ROOT / "skills" / "smartthink")
+        tools = self.home / "bin"
+        tools.mkdir()
+        for name in ("rm", "readlink", "dirname", "sed", "cut", "grep", "cat"):
+            found = shutil.which(name)
+            if found:
+                (tools / name).symlink_to(found)
+        env = {"HOME": str(self.home), "PATH": str(tools)}
+
+        completed = subprocess.run(
+            [shutil.which("bash"), str(UNINSTALL)], env=env, capture_output=True, text=True, check=False
+        )
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertIn("python3 not found", completed.stdout)
+        self.assertFalse(os.path.lexists(self.claude / "skills" / "smartthink"))
 
 
 if __name__ == "__main__":

@@ -2,6 +2,21 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/).
 
+## 3.0.2 (2026-09-26)
+
+### Fixed
+
+- `install.sh --migrate-legacy` no longer moves leftovers when another target blocks the install;
+  every target is checked first. The vault is prepared before any link is created, so an
+  unwritable vault no longer leaves a half-finished install.
+- `/st status` reports links into an older (pre-v3) checkout that still shadow the bare names.
+  The installers replace or remove those links on their own, without `--migrate-legacy`.
+- A copy of the current `/st` alias is no longer mistaken for a leftover.
+- `uninstall.sh` removes its links without `python3` and mentions a leftover `vault-pointer` when
+  you want a full reset. README states what needs Python 3.
+- `/st status` checks `st-thinker` in the session agent list, not a path relative to the repo.
+- Gate T14's resolver check sets `SMARTTHINK_VAULT` as its pass criterion requires.
+
 ## 3.0.1 (2026-09-26)
 
 ### Fixed

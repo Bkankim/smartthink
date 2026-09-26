@@ -278,8 +278,9 @@ SmartThink는 3층으로 사용자에게 맞춰 간다.
 
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code). 서브에이전트를 지원하면 armorer
   경로를 타고, 없으면 인라인 경로로 같은 팩을 만든다.
-- `scripts/build-index.py`와 `scripts/check-structure.py` 실행에 Python 3. 사용에는 필요 없고
-  개발에만 필요하다.
+- Python 3. SmartThink는 vault를 찾을 때 `scripts/resolve-vault.py`를 실행하고, `install.sh`도 그 일과
+  잔재 검사에 쓴다. `uninstall.sh`는 Python 없이도 링크는 지운다. `scripts/build-index.py`와
+  `scripts/check-structure.py`는 개발에만 필요하다.
 - `install.sh`는 macOS 또는 Linux(Windows는 [WSL2](https://learn.microsoft.com/en-us/windows/wsl/)).
   플러그인 경로에는 이 제약이 없다.
 - 선택: 일반 fetch를 차단하는 소스를 위한 `insane-search` 스킬. 없으면 해당 소스는 표기하고
