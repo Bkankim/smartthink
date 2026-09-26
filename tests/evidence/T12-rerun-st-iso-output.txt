@@ -1,0 +1,80 @@
+# T12 재실측 st-iso (2026-09-26, 수정 후 SKILL.md, Claude Code 2.1.283, --model opus, 비대화식 지시 문구 없음)
+- 호출 경로: /st  |  입력: T12 원문(--budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘)
+- 설정: 격리 CLAUDE_CONFIG_DIR. 중첩 실행이라 CLAUDE_CODE_OAUTH_TOKEN을 자식 env에만 주입([REDACTED]). CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0, SMARTTHINK_VAULT=새 임시 디렉터리, cwd=임시 디렉터리
+- 격리 settings.json 원문:
+```json
+{
+  "permissions": {
+    "allow": ["Bash", "Read", "Glob", "Grep", "Edit(/$TMPDIR/st-B-st-iso-vault.Y0aP/**)", "WebSearch", "WebFetch", "Agent", "Skill"],
+    "deny": ["Read(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]
+  }
+}
+```
+- 로딩된 SKILL.md (트랜스크립트): Base directory for this skill: ~/workspace/smartthink-fix-9-headless-gate/skills/smartthink
+- Skill 호출 순서: smartthink:st -> smartthink:smartthink
+- 메인 도구·텍스트 순서: Skill Skill Bash Bash Read Bash Read TEXT Agent TEXT Bash TEXT
+- 트랜스크립트 게이트 머리줄: ━━ SmartThink 무장 게이트 ━━ (헤드리스: 자동 진행, 상한 120K)
+- manifest: budget 120000 | research True | modules ['core-engines.md', 'cognitive-arsenal.md', 'anti-fragile-strategy.md'] | est_tokens {'pack': 109494, 'agent': 126000}
+
+## python3 scripts/check-structure.py --pack <팩 사본 디렉터리>
+PASS H. pack: pack.md and manifest.json exist
+PASS H. pack: manifest schema and boolean research
+PASS H. pack: section titles present and ordered
+PASS H. pack: section 5 verbatim hash integrity
+PASS H. pack: module markers scoped to section 5
+pack: 5 passed, 0 failed, 0 skipped
+exit=0
+
+## 표준 출력·표준 오류 원문
+# run=B-st-iso mode=iso start=2026-09-26 23:33:08 vault=$TMPDIR/st-B-st-iso-vault.Y0aP cwd=$TMPDIR/st-B-st-iso-cwd.0lx5 cfg=$TMPDIR/st-B-st-iso-cfg.ygKp
+# prompt: /st --budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘
+## 1. 무장 브리핑
+
+**활성 프레임 3**
+1. **제1원리 분해 (핵심 엔진 #1)** - "예약 시스템"을 ILS에 딸린 기능이 아니라, 희소 자원(책 사본, 좌석, 시설 시간 슬롯, 프로그램 정원)을 시민에게 나눠주는 공공 장치로 해체합니다. 관습(도서관별 예약, 1일 1관 제한, 택배 상호대차)과 기저 진실(희소성, 왕복 이동비 5,800원, 정규직 사서 6,276명)을 가르는 데 씁니다.
+2. **역전 사고 (핵심 엔진 #11 / 인지 무기고 #53)** - "3년 뒤 이 개선 전략이 실패했다면 이유는 무엇인가"를 구체적 실패 모드 10개 이상으로 먼저 쓰고, 상위 5개에 제거·완화·대비를 붙입니다. 장기 전략 검토의 뼈대입니다.
+3. **생존 우선 + 바벨 + 옵셔널리티 (안티프래질 9·2·3장)** - 서비스 중단이나 데이터 손실을 부를 수 있는 선택(단일 벤더, 한 번에 전면 교체)을 먼저 걸러냅니다. 그다음 안정 코어와 소규모 실험을 나누고, 데이터 반출권과 표준 프로토콜로 미래 선택지를 싸게 확보하는 구조인지 평가합니다.
+
+보조 프레임: 복합 우위 적층(#9)은 3~5년 동안 쌓이는 자산(집계 수요 데이터, 이용자 신뢰, 상호운용 표준, 광역 협력망)을 고를 때 씁니다. 인지 무기고의 메커니즘 디자인(#24), 2차 사고(#58), 그레이 코뿔소(#70)는 예약 규칙 설계와 부작용 추적에 씁니다.
+
+**이 작업에 적용할 규칙**
+1. 예약 대상을 도서·상호대차, 좌석, 시설·스터디룸, 프로그램 4개로 나누고, 전략 항목마다 어느 대상에 해당하는지 표기하라. 2025년 대출은 1억4,630만 권으로 제자리였고 프로그램 참가자는 6.8% 늘었다. 도서 예약 한쪽으로만 수렴하지 마라.
+2. 개선안을 평가하기 전에 가정 20개를 먼저 나열하고 "법·물리 제약인가, 관습인가"로 나눠라. 개인정보 규정과 공공 조달 규정은 물리법칙이 아니라 "바꾸는 비용이 큰 가정"으로 다뤄라.
+3. 주요 결정마다 "이것이 실패하면 예약 서비스가 멈추거나 예약 대기 데이터를 잃는가?"를 먼저 물어라. 답이 "예"이면 기대효과와 상관없이 구조부터 바꿔라(단계 전환, 이중화, 수동 대체 경로).
+4. 개선안을 안정 코어, 소규모 실험, 중간지대 셋 중 하나로 분류하라. 중간지대(대형, 일괄, 검증되지 않은 기능 묶음)는 코어로 끌어올리거나, 실험 단위로 쪼개거나, 버려라.
+5. 벤더·조달 조건은 옵션 가치로 평가하라. 데이터 반출권, 표준 프로토콜(NCIP, SIP2, Z39.50) 지원, 시스템을 옮기지 않고 지원사만 바꿀 수 있는지를 확인하라.
+6. 노쇼, 좌석 독점, 택배비 지원은 메커니즘 디자인 문제로 다뤄라. 이용자가 이기적으로 행동해도 공정한 배분이 나오도록 규칙을 거꾸로 설계하고, 선의나 계도에만 기대는 안은 떨어뜨려라.
+7. 모든 제안에 "그다음엔?"을 3번 묻고, 특히 고령·장애 등 디지털 소외 이용자가 어느 단계에서 밀려나는지 추적하라.
+8. 항목마다 "전략이 틀렸다"고 판정할 반증 지표와 검증 시점을 미리 적어라.
+9. 핵심 엔진 원문의 스타트업 기준(10x, 해자, 승자독식)을 그대로 쓰지 마라. 10x는 "이용자 시간, 공정성, 운영비 가운데 하나가 비율 단위로 구조적으로 개선되는가"로 바꿔서 적용하라.
+10. 개인 식별이 가능한 예약·대출 이력은 복합 자산으로 쌓지 마라. 누적하는 것은 집계·비식별 수요 데이터로만 한정하라.
+
+**관련 과거 인사이트**
+없음 (진화 상태가 비어 있음, 세션 0회).
+
+**경계할 편향**
+1. **스타트업 프레임 전이 편향** - 핵심 엔진·안티프래질 원문의 사례(SpaceX, Amazon, 해자, 승자독식) 때문에 이 작업의 목표를 "경쟁 우위·독점"으로 착각할 수 있습니다. 공공 도서관 예약의 목표는 경쟁이 아니라 공정한 배분입니다.
+   회피: 분석에서 원문 사례를 쓸 때마다 "공공 도서관에서의 대응물"을 한 줄로 옮겨 적고, 옮길 수 없는 사례는 버립니다.
+2. **측정 가능성 편향 (핵심 엔진 유래)** - 노쇼율, 대기일수, 건당 택배비처럼 수치로 잡히는 지표만 최적화하고, 디지털 소외나 독서 프라이버시(예약 이력이 곧 독서 이력) 같은 정성 가치를 놓칠 수 있습니다.
+   회피: 성공 기준을 적을 때 정량 지표 1개마다 정성 가드레일 1개(예: 앱 없이도 예약할 수 있는가)를 짝지어 적습니다.
+3. **해석 조기 수렴 (작업 해석 유래)** - "예약 시스템 개선"을 IT 시스템 교체나 앱 개발 문제로 좁히고, 규칙·조직·예산·협력 구조를 빠뜨릴 수 있습니다. "검토"가 기존 전략안을 검토하는 일인지 새로 세우는 일인지도 아직 정해지지 않았습니다.
+   회피: 첫 분석 단계에서 개선 레버를 기술, 규칙, 조직·인력, 예산·조달, 협력(광역·국가) 5개로 나누고, 레버마다 후보를 1개 이상 적은 뒤에 범위를 좁힙니다.
+
+**다음 단계**
+무장을 마쳤습니다. 이제 본 작업(지역 도서관 예약 시스템 장기 개선 전략 검토)을 시작하시면 됩니다. Complex 도메인이라 깊은 추론이 필요하니 `/effort xhigh` 설정을 권합니다. 리서치는 수행했습니다(출처 16개, 차단 0건). 다만 노쇼율, 예약 대기일수, 좌석 회전율 같은 운영 지표는 공개된 수치를 찾지 못했으니, 분석에서 이 값이 필요하면 가정이라고 표시하세요. 토큰 예산(120K)을 맞추려고 패턴 합성 모듈은 팩에서 뺐습니다. 메타인지 모듈은 게이트 단계에서 이미 제외됐습니다.
+
+팩: $TMPDIR/st-B-st-iso-vault.Y0aP/packs/2026-09-26-library-reservation-longterm-strategy/  |  모듈: 핵심 엔진, 인지 무기고, 안티프래질 전략  |  비용: 팩 ≈109K / 작업 ≈126K  |  리서치: ON
+
+게이트 추정과 다른 점: 게이트에서는 모듈 4개로 ≈117K를 예상했지만, armorer가 추가로 패턴 합성을 빼서 실제 팩은 모듈 3개, ≈109K입니다.
+
+프로필이 없습니다. `/st init`으로 프로필을 만들면 다음 무장부터 사용자에 맞게 모듈을 고릅니다.
+
+무장 완료. 이제 작업을 지시하세요.
+깊은 작업이라면 /effort xhigh 를 먼저 실행하는 것을 권장합니다.
+
+헤드리스: 자동 진행 | 상한 120K | 절삭: 메타인지(게이트), 패턴 합성(armorer) 제외 | 복원: 없음 | 팩: $TMPDIR/st-B-st-iso-vault.Y0aP/packs/2026-09-26-library-reservation-longterm-strategy/
+# exit=0 end=2026-09-26 23:41:45
+# packs:
+$TMPDIR/st-B-st-iso-vault.Y0aP/evolution-state.md
+$TMPDIR/st-B-st-iso-vault.Y0aP/packs/2026-09-26-library-reservation-longterm-strategy/pack.md
+$TMPDIR/st-B-st-iso-vault.Y0aP/packs/2026-09-26-library-reservation-longterm-strategy/manifest.json

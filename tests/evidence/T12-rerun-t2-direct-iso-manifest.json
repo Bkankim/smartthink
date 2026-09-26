@@ -1,0 +1,13 @@
+{
+  "task": "공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘",
+  "interpretation": "공공 도서관 예약(홀드) 대기열 안내 화면(순번, 예상 대기, 상태 전환, 수령 안내)의 개선 실행 계획을 문제 진단 → 개선안 → 검증 → 단계별 롤아웃으로 설계한다. 화면은 대기를 줄이지 못하고 설명할 뿐이므로 표시/정책/공급 원인을 분리하고, ILS 벤더 제약 안에서 Type 1/Type 2 변경을 구분한다.",
+  "cynefin": "Complicated",
+  "classification": "문제 해결",
+  "modules": ["핵심 엔진", "실행 속도"],
+  "budget": 60000,
+  "research": true,
+  "profile_version": null,
+  "est_tokens": { "pack": 53945, "agent": 61000 },
+  "created": "2026-09-26T23:36:06+09:00",
+  "harness": "claude-code"
+}
