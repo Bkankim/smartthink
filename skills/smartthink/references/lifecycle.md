@@ -327,6 +327,7 @@ v3 스키마 자체는 `references/analysis-method.md` Step 5의 스키마 절�
 
 **읽기 전용이다. 아무것도 쓰지 않는다.** vault 시드 생성도, `updated` 갱신도, 팩 삭제도 하지 않는다.
 고칠 게 보이면 **무엇을 하면 되는지 안내만** 하고 사용자가 실행하게 한다.
+`{VAULT}`는 resolver를 **`--ensure` 없이** 실행해 얻는다(`python3 "{SCRIPTS_DIR}/resolve-vault.py"`).
 
 ### 1. 프로필 요약
 
@@ -361,9 +362,11 @@ v2 형식(YAML 헤더 없음)이면 그 사실을 표시하고 "첫 `/st retain`
 
 | 항목 | 확인 방법 | NG일 때의 의미 |
 |---|---|---|
-| 에이전트 정의 `st-armorer` | `agents/st-armorer.md` 존재 | 팩 작성이 general-purpose 폴백 또는 인라인 경로로 내려감 |
+| 에이전트 정의 `st-armorer` | 현재 세션 에이전트 목록에 `smartthink:st-armorer` 또는 `st-armorer` | 팩 작성이 general-purpose 폴백으로 내려가 성능이 떨어짐(effort·도구 설정 없이 실행). 인라인 경로일 수도 있음 |
 | 에이전트 정의 `st-thinker` | `agents/st-thinker.md` 존재 | `--report`가 general-purpose + `thinker-prompt.md` 폴백으로 내려감 |
 | Agent 도구 사용 가능 | 현재 세션의 도구 목록 | 인라인 경로로 동작한다. 리서치가 메인 컨텍스트를 소모하고 게이트에 비용이 표시됨 |
+| 사용자 레벨 옛 설치 잔재 | `python3 "{SCRIPTS_DIR}/legacy-install.py" detect` 출력이 비어 있음 | 복사 설치된 옛 파일이 bare 이름(`/st`, `/smartthink`, `st-thinker`)을 선점해 이 버전 대신 열림 |
+| vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고 1줄 표시 |
 | vault 쓰기 가능 | **디렉터리 권한으로 판정**(`test -w {VAULT}`) | 팩·프로필·진화 상태가 기록되지 않음 |
 | 권한 규칙 | `~/.claude/settings.json`에 `Edit(<VAULT>/**)` | 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸 |
 | `references/index.json` | 파일 존재 | 게이트의 비용 추정이 사전 계산값 대신 실측 근사로 내려감 |
@@ -381,4 +384,6 @@ NG 항목이 있으면 **무엇을 하면 되는지 1줄씩** 붙인다. 전부 
   프로필 없음          /st init 으로 프로필을 만들면 다음 무장부터 사용자에 맞게 라우팅됨
   권한 규칙 없음        /st init 을 다시 돌리면 규칙 설치를 다시 물어봄 (거절해도 동작함)
   팩 23개 (상한 20)     {VAULT}/packs/ 에서 오래된 3개를 지울지 확인 (자동 삭제하지 않음)
+  옛 설치 잔재          SmartThink 클론에서 ./install.sh --migrate-legacy (플러그인 설치면 ./uninstall.sh --migrate-legacy). 잔재는 ~/.claude/.backup/ 으로 이동만 됨
+  st-armorer 없음       install.sh 사용자는 클론에서 ./install.sh 재실행, 플러그인 사용자는 플러그인 재설치
 ```

@@ -66,6 +66,27 @@ cd smartthink
 설치하고 `~/.claude/smartthink-vault/`에 빈 vault를 시드한다(`SMARTTHINK_VAULT`로 변경 가능).
 v2에서 올라오는 경우 v3에서 삭제된 에이전트 정의를 가리키던 심링크도 함께 정리한다.
 
+#### 이전 설치에서 올라오는 경우
+
+이전 릴리스를 `install.sh`의 심링크가 아니라 **파일 복사**로 설치했다면, 실파일이 bare 이름
+`/st`, `/smartthink`, `st-thinker`를 그대로 차지해 이 버전을 설치한 뒤에도 옛 버전이 열린다.
+먼저 확인한다.
+
+```bash
+ls -l ~/.claude/skills/smartthink ~/.claude/commands/st.md ~/.claude/agents/st-*.md
+```
+
+클론을 가리키는 심링크라면 문제없다. `install.sh`가 잔재를 찾으면 아무것도 바꾸지 않고 멈춘 뒤
+아래 명령을 안내한다.
+
+```bash
+./install.sh --migrate-legacy
+```
+
+잔재를 `~/.claude/.backup/smartthink-legacy-<시각>/`으로 옮기고(삭제하지 않는다) 설치한다.
+플러그인 사용자는 클론에서 `./uninstall.sh --migrate-legacy`를 실행하면 심링크 설치 없이 잔재만
+치울 수 있다. `/smartthink:smartthink status`도 잔재를 알려준다.
+
 **설치 후에는 새 Claude Code 세션을 열어라.** 기존 세션은 새 스킬·에이전트를 인식하지 않는다.
 
 ---
@@ -208,8 +229,10 @@ SmartThink는 3층으로 사용자에게 맞춰 간다.
 - **`/st status`**는 프로필 요약, 최근 팩 5개, 진화 카운트, 환경 진단을 보여주고 문제마다
   무엇을 하면 되는지 한 줄씩 붙인다. 아무것도 쓰지 않는다.
 
-이 전부가 **리포 바깥**에 산다. 기본값은 `~/.claude/smartthink-vault/`이고 `SMARTTHINK_VAULT`나
-프로필로 옮길 수 있다. 개인 인사이트가 리포에 커밋되는 일은 없다.
+이 전부가 **리포 바깥**에 산다. 기본값은 `~/.claude/smartthink-vault/`다. 다른 디렉터리를 쓰려면
+`SMARTTHINK_VAULT`를 설정하거나(비어 있어도 그대로 쓴다) `/st init`에서 고르면 된다. init은 그 경로를
+`~/.claude/smartthink-vault/vault-pointer`에 기록한다. 이 규칙은 `scripts/resolve-vault.py`가 적용한다.
+개인 인사이트가 리포에 커밋되는 일은 없다.
 
 ---
 
@@ -273,6 +296,8 @@ cd smartthink
 ```
 
 심링크만 지우고 vault는 남는다. 완전 초기화는 `~/.claude/smartthink-vault/`를 직접 삭제하면 된다.
+이전 복사 설치가 남긴 실파일이 있으면 `uninstall.sh`가 멈추고 `./uninstall.sh --migrate-legacy`를
+안내한다. 이 옵션은 잔재를 `~/.claude/.backup/`으로 옮긴다.
 
 ---
 
