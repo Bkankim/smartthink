@@ -102,6 +102,8 @@ Base directory for this skill: <HOME>/workspace/smartthink-st-14-init-perm/skill
   ⏸ manual mode on · ? for shortcuts · ← for agents
 ```
 
+> 코디네이터 개입 1건: 이 세션의 Bash 승인 프롬프트(settings.json 검증·resolver·ls)가 138초 방치돼 코디네이터가 1회 승인으로 응답했다. 위 `❯ 1`은 겹친 응답의 잉여 입력이다.
+
 ## 세션 2: 새 세션(같은 격리 설정), 무장
 
 입력: `/smartthink:smartthink 지역 문화센터 수업 신청 흐름을 개선해줘` → 게이트에서 `리서치 끄고 진행 (--nosearch)`. 백그라운드 `smartthink:st-armorer`의 도구 호출(서브에이전트 jsonl)과 부모 세션 프롬프트는 `T9-fix-prompt-observation.md`에 정리했다.
@@ -177,6 +179,8 @@ Base directory for this skill: <HOME>/workspace/smartthink-st-14-init-perm/skill
    3. No
  Esc to cancel · Tab to amend
 ```
+
+> 코디네이터 개입 2건: manifest.json Create 프롬프트 134초 방치에 `1`(Yes, 1회) 응답, 이어 armorer의 `check-structure --pack` Bash 프롬프트에 `1` 응답.
 
 ## 세션 5: 기본 vault, 새 가짜 HOME2, init (2번째 커밋 코드, permission_rule_effective 분기)
 
