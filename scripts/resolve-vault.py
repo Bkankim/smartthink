@@ -15,9 +15,12 @@ under ~/.claude whatever the allow rules say. The pre-#20 default and its pointe
 
 Output: {"path": "<absolute path>", "source": "env|pointer|default"}
 --permission-rule adds "permission_rule" (the Edit allow rule `st init` installs for the vault) and
-"settings_path" (${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json, the file it goes into), plus
-"permission_rule_effective": false when the vault sits under ~/.claude, which Claude Code treats as
-sensitive and keeps prompting for whatever the allow rules say.
+"settings_path" (${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json, the file it goes into; null with a
+warning when CLAUDE_CONFIG_DIR is relative), plus "permission_rule_effective" and
+"permission_rule_reason". The rule is not effective, and the reason says why, when the vault sits
+under ~/.claude ("home-claude") or under a .claude/.git/.vscode/.idea folder ("protected-folder"),
+which Claude Code treats as sensitive whatever the allow rules say, or when its path holds glob or
+rule syntax the rule does not escape ("special-characters").
 --ensure also creates packs/ and copies the evolution-state template when absent. profile.md is
 left to `st init`.
 --candidates instead lists existing note stores under HOME for `st init` step 5 to offer: signals,
@@ -103,21 +106,51 @@ def permission_rule(vault: Path) -> str:
     return "Edit(~/**)" if relative == Path(".") else f"Edit(~/{relative.as_posix()}/**)"
 
 
-def rule_is_effective(vault: Path) -> bool:
+def under_home_claude(vault: Path) -> bool:
     # Claude Code prompts for every write under $HOME/.claude ("a sensitive file") even when an
     # allow rule matches, and this follows HOME, not CLAUDE_CONFIG_DIR (issue #14 probes P1-P6).
     # Compare real paths so a vault reached through a symlink into ~/.claude is still caught.
     try:
         Path(os.path.realpath(vault)).relative_to(os.path.realpath(Path.home() / ".claude"))
     except ValueError:
-        return True
-    return False
+        return False
+    return True
 
 
-def settings_path() -> Path:
+# Glob and rule syntax the rule string does not escape (issue #23): a vault named "Obsidian [main]"
+# would turn [main] into a character class, so the rule may never match the vault.
+RULE_SYNTAX = set("[]*?{}()")
+# Folder names Claude Code treats as sensitive wherever they appear in a path: headless probes
+# (issue #20, Claude Code 2.1.283) denied Writes under each despite a matching Edit(//abs/**) allow
+# rule, inside or outside a repo and whatever the cwd. A hidden folder like .notes was not guarded.
+PROTECTED_FOLDERS = {".claude", ".git", ".vscode", ".idea"}
+
+
+def ineffective_reason(vault: Path) -> str | None:
+    # Why an Edit allow rule for this vault would not stop the write prompts, or None if it would.
+    if under_home_claude(vault):
+        return "home-claude"
+    if PROTECTED_FOLDERS.intersection((*vault.parts, *Path(os.path.realpath(vault)).parts)):
+        return "protected-folder"
+    if RULE_SYNTAX.intersection(str(vault)):
+        return "special-characters"
+    return None
+
+
+def settings_path() -> Path | None:
     # Claude Code reads user settings from CLAUDE_CONFIG_DIR when it is set, not from ~/.claude.
+    # A relative value resolves against the session's own cwd, which this process cannot know
+    # (issue #23), so name no file rather than one the session may not read.
     config_dir = (os.environ.get("CLAUDE_CONFIG_DIR") or "").strip()
-    base = Path(config_dir).expanduser() if config_dir else Path.home() / ".claude"
+    if not config_dir:
+        return Path.home() / ".claude" / "settings.json"
+    base = Path(config_dir).expanduser()
+    if not base.is_absolute():
+        print(
+            f"warning: CLAUDE_CONFIG_DIR '{config_dir}' is relative; not naming a settings file for it",
+            file=sys.stderr,
+        )
+        return None
     return Path(os.path.abspath(base)) / "settings.json"
 
 
@@ -128,10 +161,10 @@ NAME_WORDS = ("second-brain", "vault", "notes")
 MAX_DEPTH = 3
 # The walk never enters these. Hidden folders (app state, ~/.claude, .git, .Trash) are skipped too.
 SKIPPED_NAMES = {"Library", "node_modules"}
-# Never offered even when a registry names them: Claude Code guards writes under .claude and .git
-# (issue #14, #20), and a trashed or dependency folder is not a note store. Library stays allowed
+# Never offered even when a registry names them, together with PROTECTED_FOLDERS (Claude Code guards
+# writes there): a trashed or dependency folder is not a note store. Library stays allowed
 # for registry entries because iCloud-synced Obsidian vaults live under ~/Library.
-REFUSED_PARTS = {".claude", ".git", ".Trash", "node_modules"}
+REFUSED_PARTS = {".Trash", "node_modules"}
 # Candidate facts are cheap approximations: names and mtimes only, never file contents.
 FILE_COUNT_CAP = 5000
 STALE_DAYS = 180
@@ -182,11 +215,14 @@ def obsidian_registries() -> list[Path]:
     ]
 
 
-def count_files(directory: Path) -> tuple[int, float | None]:
+def count_files(directory: Path, deadline: float) -> tuple[int, float | None, bool]:
     # Count files (stopping at FILE_COUNT_CAP) and track the newest mtime, skipping hidden folders.
+    # The third value is False when the deadline cut the count short.
     count, newest = 0, None
     stack = [directory]
     while stack and count < FILE_COUNT_CAP:
+        if time.monotonic() >= deadline:
+            return count, newest, False
         try:
             entries = list(os.scandir(stack.pop()))
         except OSError:
@@ -200,29 +236,45 @@ def count_files(directory: Path) -> tuple[int, float | None]:
                 count += 1
                 mtime = entry.stat(follow_symlinks=False).st_mtime
                 newest = mtime if newest is None else max(newest, mtime)
-    return count, newest
+    return count, newest, True
 
 
 def in_git_repo(directory: Path) -> bool:
     return any((folder / ".git").exists() for folder in (directory, *directory.parents))
 
 
-def nested_repos(directory: Path) -> int:
+def nested_repos(directory: Path, deadline: float) -> int | None:
     # Repositories among the children and grandchildren: a work folder, not a note store.
-    return sum(1 for folder in (*directory.glob("[!.]*"), *directory.glob("[!.]*/[!.]*")) if (folder / ".git").is_dir())
+    # None when the deadline passed before the answer was known.
+    found = 0
+    for pattern in ("[!.]*", "[!.]*/[!.]*"):
+        for folder in directory.glob(pattern):
+            if time.monotonic() >= deadline:
+                return None
+            if (folder / ".git").is_dir():
+                found += 1
+                if found >= WORKSPACE_REPOS:
+                    return found
+    return found
 
 
-def describe(directory: Path, signals: list[str]) -> dict:
-    count, newest = count_files(directory)
+def describe(directory: Path, signals: list[str], deadline: float, state: dict) -> dict:
+    count, newest, counted = count_files(directory, deadline)
+    repos = nested_repos(directory, deadline) if counted else None
     if newest is None:
         newest = directory.stat().st_mtime
     warnings = []
-    if time.time() - newest > STALE_DAYS * 86400:
-        warnings.append("stale")
-    if count <= NEARLY_EMPTY_FILES:
-        warnings.append("nearly-empty")
-    if nested_repos(directory) >= WORKSPACE_REPOS:
-        warnings.append("workspace-root")
+    if counted and repos is not None:
+        if time.time() - newest > STALE_DAYS * 86400:
+            warnings.append("stale")
+        if count <= NEARLY_EMPTY_FILES:
+            warnings.append("nearly-empty")
+        if repos >= WORKSPACE_REPOS:
+            warnings.append("workspace-root")
+    else:
+        # The time limit cut the facts short, so the other warnings would be guesses.
+        warnings.append("partial")
+        state["timed_out"] = True
     return {
         "path": str(directory),
         "signals": signals,
@@ -235,9 +287,9 @@ def describe(directory: Path, signals: list[str]) -> dict:
 
 
 def is_refused(directory: Path) -> bool:
-    if REFUSED_PARTS.intersection(directory.parts):
+    if (REFUSED_PARTS | PROTECTED_FOLDERS).intersection(directory.parts):
         return True
-    return not rule_is_effective(directory)
+    return under_home_claude(directory)
 
 
 def registered_vaults() -> list[Path]:
@@ -267,11 +319,14 @@ def candidates(time_limit: float) -> dict:
     for directory in registered_vaults():
         add(directory, ["registry:obsidian"] + signals_of(directory))
     state = {"timed_out": False}
-    for directory in walk_dirs(Path.home(), time.monotonic() + time_limit, state):
+    deadline = time.monotonic() + time_limit
+    for directory in walk_dirs(Path.home(), deadline, state):
         signals = signals_of(directory)
         if signals:
             add(directory, signals)
-    listed = sorted((describe(entry["path"], entry["signals"]) for entry in found.values()), key=lambda c: c["path"])
+    # One deadline covers the walk and describing the candidates it found.
+    described = (describe(entry["path"], entry["signals"], deadline, state) for entry in found.values())
+    listed = sorted(described, key=lambda candidate: candidate["path"])
     return {
         "candidates": listed,
         "create_new": {"path": str(default_vault())},
@@ -321,8 +376,11 @@ def main() -> int:
     result = {"path": str(vault), "source": source}
     if arguments.permission_rule:
         result["permission_rule"] = permission_rule(vault)
-        result["settings_path"] = str(settings_path())
-        result["permission_rule_effective"] = rule_is_effective(vault)
+        target = settings_path()
+        result["settings_path"] = str(target) if target else None
+        reason = ineffective_reason(vault)
+        result["permission_rule_effective"] = reason is None
+        result["permission_rule_reason"] = reason
     print(json.dumps(result, ensure_ascii=False))
     return 0
 

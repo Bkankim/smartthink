@@ -274,6 +274,43 @@ class ResolveVaultTest(unittest.TestCase):
 
         self.assertTrue(result["permission_rule_effective"])
 
+    def test_rule_syntax_characters_make_the_rule_ineffective(self) -> None:
+        # Issue #23: [ ] * ? { } ( ) are glob or rule syntax and are not escaped, so the rule may
+        # not match the vault. Refuse to call it effective and say why.
+        for name in ("Obsidian [main]", "notes*", "what?", "a{b}", "x (copy)"):
+            with self.subTest(name=name):
+                result = self.run_rule(vault_env=str(self.home / name / "smartthink"))
+
+                self.assertFalse(result["permission_rule_effective"])
+                self.assertEqual(result["permission_rule_reason"], "special-characters")
+
+    def test_effective_rule_has_no_reason(self) -> None:
+        result = self.run_rule(vault_env=str(self.home / "notes" / "smartthink"))
+
+        self.assertTrue(result["permission_rule_effective"])
+        self.assertIsNone(result["permission_rule_reason"])
+
+    def test_relative_claude_config_dir_leaves_settings_path_empty(self) -> None:
+        # Issue #23: a relative CLAUDE_CONFIG_DIR depends on the session's own cwd, which the
+        # resolver cannot know, so it names no settings file and warns instead of guessing.
+        completed = self.run_resolver_raw("--permission-rule", CLAUDE_CONFIG_DIR="rel-config")
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIsNone(json.loads(completed.stdout)["settings_path"])
+        self.assertIn("CLAUDE_CONFIG_DIR", completed.stderr)
+
+    def test_rule_under_protected_folders_is_not_effective(self) -> None:
+        # Headless probes (#20, Claude Code 2.1.283) denied Writes as "a sensitive file" under any
+        # .claude, .git, .vscode or .idea folder despite a matching Edit(//abs/**) allow rule,
+        # inside or outside a repo and whatever the cwd. A hidden folder like .notes was fine.
+        for parts in (("repo", ".claude", "vault"), ("repo", ".git", "vault"), ("w", ".vscode", "v"), ("w", ".idea", "v")):
+            with self.subTest(parts=parts):
+                result = self.run_rule(vault_env=str(self.root.joinpath("outside", *parts)))
+
+                self.assertFalse(result["permission_rule_effective"])
+                self.assertEqual(result["permission_rule_reason"], "protected-folder")
+        self.assertTrue(self.run_rule(vault_env=str(self.root / "outside" / ".notes" / "v"))["permission_rule_effective"])
+
     def test_rule_fields_are_opt_in(self) -> None:
         result = self.run_resolver()
 
@@ -459,6 +496,27 @@ class CandidatesTest(unittest.TestCase):
         self.assertEqual(set(unbounded), {"candidates", "create_new", "scan"})
         self.assertEqual(unbounded["scan"], {"root": str(self.home), "max_depth": 3, "timed_out": False})
         self.assertTrue(stopped["scan"]["timed_out"])
+
+    def test_time_limit_also_bounds_describing_candidates(self) -> None:
+        # The registry is read before the walk, so its entries reach describe() even when the walk
+        # stops at once. Counting a big tree must stop at the limit too and say the facts are partial.
+        big = self.home / "Big Vault"
+        for folder in range(30):
+            (big / f"d{folder}").mkdir(parents=True)
+            for index in range(100):
+                (big / f"d{folder}" / f"n{index}.md").write_text("x\n", encoding="utf-8")
+        self.write_registry(".config/obsidian/obsidian.json", str(big))
+
+        stopped = self.scan("--time-limit", "0")
+        full = self.by_path(self.scan())
+
+        self.assertTrue(stopped["scan"]["timed_out"])
+        [candidate] = stopped["candidates"]
+        self.assertEqual(candidate["path"], str(big))
+        self.assertLess(candidate["file_count"], 3000)
+        self.assertEqual(candidate["warnings"], ["partial"])
+        self.assertEqual(full[str(big)]["file_count"], 3000)
+        self.assertNotIn("partial", full[str(big)]["warnings"])
 
 
 if __name__ == "__main__":
