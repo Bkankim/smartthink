@@ -68,6 +68,27 @@ It installs one skill (`smartthink`), two agent definitions (`st-thinker`, `st-a
 (override with `SMARTTHINK_VAULT`). Upgrading from v2 also clears the symlink to the agent
 definition that v3 deleted.
 
+#### Upgrading from an earlier install
+
+An earlier release installed by **copying** files (instead of `install.sh`'s symlinks) leaves real
+files that keep the bare names `/st`, `/smartthink` and `st-thinker`, so they open the old version
+even after you install this one. Check for them:
+
+```bash
+ls -l ~/.claude/skills/smartthink ~/.claude/commands/st.md ~/.claude/agents/st-*.md
+```
+
+Symlinks into your clone are fine. If `install.sh` finds leftovers, it stops without changing
+anything and tells you to run:
+
+```bash
+./install.sh --migrate-legacy
+```
+
+That moves each leftover to `~/.claude/.backup/smartthink-legacy-<timestamp>/` (nothing is deleted)
+and then installs. Plugin users can run `./uninstall.sh --migrate-legacy` from a clone to clear the
+leftovers without installing the symlinks. `/smartthink:smartthink status` also reports them.
+
 **Start a new Claude Code session afterwards.** Existing sessions do not pick up new skills or agents.
 
 ---
@@ -211,8 +232,10 @@ SmartThink adapts to you across three layers.
 - **`/st status`** prints the profile summary, the five most recent packs, evolution counts, and an
   environment diagnosis with one line per problem on how to fix it. It writes nothing.
 
-All of it lives **outside the repository**, at `~/.claude/smartthink-vault/` by default, or wherever
-you point `SMARTTHINK_VAULT` or your profile. Your insights are never committed.
+All of it lives **outside the repository**, at `~/.claude/smartthink-vault/` by default. Set
+`SMARTTHINK_VAULT` to use another directory (it is used as-is, even when empty), or pick one during
+`/st init`, which records it in `~/.claude/smartthink-vault/vault-pointer`. `scripts/resolve-vault.py`
+applies these rules. Your insights are never committed.
 
 ---
 
@@ -279,6 +302,8 @@ cd smartthink
 ```
 
 Symlinks go, the vault stays. Delete `~/.claude/smartthink-vault/` yourself for a full reset.
+If an earlier copy install left real files behind, `uninstall.sh` stops and asks for
+`./uninstall.sh --migrate-legacy`, which moves them to `~/.claude/.backup/`.
 
 ---
 

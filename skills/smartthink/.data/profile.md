@@ -57,11 +57,12 @@ updated:
 
 <!-- 출처: 인터뷰 5문(vault 경로, D24) + st init 사전 스캔(D23, 로컬 읽기만·외부 전송 없음) -->
 
-- vault 경로: _(미설정 - 기본 `~/.claude/smartthink-vault`, D29)_
+- vault 경로: _(미설정)_
 - 노트 디렉터리: _(미설정)_
 - 발견된 에이전트 파일: _(미설정)_
 
 <!-- 예: vault 경로 = ~/notes/smartthink  (기존 노트 vault 안에 하위 디렉터리로) -->
+<!-- vault 경로는 표시용이다. 실제 해석은 resolver가 SMARTTHINK_VAULT와 vault-pointer로 한다. -->
 <!-- 예: 노트 디렉터리 = ~/notes/projects -->
 <!-- 예: 발견된 에이전트 파일 = ./AGENTS.md, ./CLAUDE.md, ~/.claude/CLAUDE.md -->
 

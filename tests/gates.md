@@ -64,7 +64,7 @@ test -n "$ST_VAULT" && test -d "$ST_VAULT" && rm -rf "$ST_VAULT"
 test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 ```
 
-## 3. 게이트 T1~T13
+## 3. 게이트 T1~T14
 
 ### T1. `/st init` 신규 프로필
 
@@ -240,6 +240,25 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
   - Codex가 호출 또는 스킬 로딩 자체를 지원하지 않으면 `BLOCKED`로 판정하고, 기능 FAIL로 오판하지 않는다.
 - **증거**: 실행 시 `T13-transcript.md`, `T13-manifest.json`, `T13-pack.md`를 남긴다. 실행 불가 시 `T13-blocked.md`에 시도한 호출, 오류 원문, 필요한 Codex 통합 조건을 남긴다.
 
+### T14. 빈 `SMARTTHINK_VAULT`는 폴백하지 않는다
+
+- **목적**: 명시적으로 지정된 vault가 비어 있어도 그대로 쓰고, 기본 vault(`~/.claude/smartthink-vault`)를 건드리지 않는지 확인한다(이슈 #10 회귀).
+- **사전 조건**: `scripts/resolve-vault.py`가 있다. 빈 임시 디렉터리 하나와 비교용 마커 파일을 만든다. 기본 vault를 오염시킬 수 있는 실험이므로 가능하면 격리된 `HOME`에서 실행하고, 실제 `HOME`에서 돌릴 때는 사전에 기본 vault를 백업한다.
+- **입력**:
+  ```bash
+  export ST_EMPTY="$(mktemp -d)"; touch "$TMPDIR/st14-marker"
+  python3 scripts/resolve-vault.py            # 단위 확인: source가 env여야 한다
+  SMARTTHINK_VAULT="$ST_EMPTY" claude --plugin-dir . -p '/smartthink:smartthink --nosearch 지역 도서관 좌석 안내를 개선해줘'
+  find ~/.claude/smartthink-vault -newer "$TMPDIR/st14-marker"
+  ```
+  중첩 Claude Code 세션 안에서는 자식 프로세스가 `CLAUDE_CODE_OAUTH_TOKEN`만 읽는다(T12 참고). 게이트 자동 진행 회귀(#9)가 남아 있으면 입력 끝에 비대화식 진행 지시 1줄을 붙이고 그 사실을 기록한다.
+- **통과 기준**:
+  - resolver 단위 확인의 출력이 `{"path": "$ST_EMPTY", "source": "env"}`다.
+  - 헤드리스 실행이 팩을 만든다면 `$ST_EMPTY/packs/` 아래에 만든다.
+  - 마지막 `find` 출력이 비어 있다. 기본 vault에 새 파일이나 수정이 하나도 없다.
+- **증거**: `T14-output.txt`에 resolver 출력, 헤드리스 표준 출력, `find` 결과를 남긴다. 실행 불가 시 `T14-blocked.md`에 시도한 명령, 오류 원문, 필요한 조건을 남긴다.
+- **단위 대체 검증**: 헤드리스 실측이 막혀도 `tests/test_resolve_vault.py`와 `tests/test_migrate_target.py`가 같은 규칙(빈 env vault 사용, 기본 vault 폴백 없음)을 매번 검증한다.
+
 ## 4. 실측 기록
 
 아래 표는 실행 중 답이 나온 즉시 채운다. 추정이나 과거 지식으로 채우지 않는다.
@@ -271,3 +290,4 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 | T11 | PASS | 2026-09-08 | T11-skills.txt, T11-transcript.md, T11-observation.md | 실제 호출 이름 `/smartthink:smartthink`. `/st`·`/smartthink`·`/smartthink:st`는 전역 v2로 감. agents 등록 필드 불필요 |
 | T12 | PASS | 2026-09-08 | T12-output.txt, T12-manifest.json, T12-pack.md | run1(문서 원문)은 Not logged in exit 1(중첩 자식 인증). run2(`CLAUDE_CODE_OAUTH_TOKEN` 주입)에서 자동 진행·120K 상한·절삭 출력·턴 종료. 헤드리스도 `/st`가 v2를 먼저 열고 스스로 v3 재호출 |
 | T13 | BLOCKED | 2026-09-08 | T13-blocked.md | codex exec에서 `/smartthink` 미등록(자유 텍스트로 처리). cwd가 리포라 SKILL.md를 읽어 게이트만 출력, 인라인 안내문 없음, 팩 없음 |
+| T14 | BLOCKED | 2026-09-26 | T14-output.txt, T14-blocked.md | 격리 HOME에 권한 허용 규칙이 없어 `-p` 자식의 resolver 호출 8회가 전부 승인 대기로 거부, 팩 미생성. resolver 단위 출력 source=env, 실제 기본 vault `find -newer` 비어 있음. 자식이 /tmp·리포 안에 vault 즉흥 생성 시도(거부) → SKILL.md에 금지 명시. 복합 명령 호출은 절대경로 한 줄로 교체 |
