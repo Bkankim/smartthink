@@ -40,6 +40,7 @@ cd smartthink
 
 python3 scripts/build-index.py        # only if you touched references/
 python3 scripts/check-structure.py    # must be green
+python3 -m unittest discover -s tests -p 'test_*.py'   # resolver and installer behaviour, temp HOME only
 python3 scripts/check-structure.py --strict   # the final gate before a release
 ```
 
