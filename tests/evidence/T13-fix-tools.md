@@ -24,7 +24,10 @@
 ## 격리 CODEX_HOME 구성 (재현 절차)
 
 ```sh
-CH="$(mktemp -d)"
+WT="<검증 대상 체크아웃 절대경로>"        # 리포 밖 cwd에서 쓰므로 절대경로로 직접 지정한다
+: "${WT:?WT 미정의}"                     # 비었으면 여기서 멈춘다
+test -f "$WT/skills/smartthink/SKILL.md" || echo "WT 확인 실패 - 아래를 실행하지 말고 WT를 고친다" >&2
+CH="$(mktemp -d)"                        # 이후 T13 명령은 이 셸에서 $CH를 그대로 쓴다
 ln -s ~/.codex/auth.json "$CH/auth.json"                      # 복사하지 않는다
 mkdir -p "$CH/skills" && ln -s "$WT/skills/smartthink" "$CH/skills/smartthink"   # 워크트리 스킬
 python3 - "$CH" <<'EOF'
