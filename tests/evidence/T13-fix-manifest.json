@@ -1,0 +1,22 @@
+{
+  "task": "지역 보행자 안전 안내를 개선해줘",
+  "interpretation": "지역과 안내 수단 미지정. A 현장 안내 재설계, B 주민 대상 메시지와 캠페인, C 디지털 실시간 안내를 모두 남김",
+  "cynefin": "Complicated/Complex 경계",
+  "classification": "문제 해결",
+  "modules": [
+    "core-engines.md",
+    "cognitive-arsenal.md",
+    "triz-innovation.md",
+    "meta-cognition.md",
+    "pattern-synthesis.md"
+  ],
+  "budget": null,
+  "research": false,
+  "profile_version": null,
+  "est_tokens": {
+    "pack": 141000,
+    "agent": 142000
+  },
+  "created": "2026-09-26T16:38:05Z",
+  "harness": "codex-inline"
+}
