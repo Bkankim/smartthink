@@ -21,6 +21,11 @@ warning when CLAUDE_CONFIG_DIR is relative), plus "permission_rule_effective" an
 under ~/.claude ("home-claude") or under a .claude/.git/.vscode/.idea folder ("protected-folder"),
 which Claude Code treats as sensitive whatever the allow rules say, or when its path holds glob or
 rule syntax the rule does not escape ("special-characters").
+It also prints the rest of the bundle `st init` offers so an arming run asks nothing (issue #26):
+"bash_rules" and "command_prefixes" for the two scripts a session runs (this one and
+assemble-pack.py, taken from the path this script was invoked by, symlinks not resolved) with
+"bash_rules_effective", and "read_rule" for the sibling skills/smartthink/ directory the session and
+the armorer Read, with "read_rule_effective".
 --ensure also creates packs/ and copies the evolution-state template when absent. profile.md is
 left to `st init`.
 --candidates instead lists existing note stores under HOME for `st init` step 5 to offer: signals,
@@ -95,15 +100,19 @@ def resolve() -> tuple[Path, str]:
     return default_vault(), "default"
 
 
-def permission_rule(vault: Path) -> str:
+def path_rule(tool: str, directory: Path) -> str:
     # A rule path starting with a single / is relative to the settings file, so it never matches an
-    # absolute vault (issue #14). Use ~/ under the home directory and // (absolute) elsewhere.
+    # absolute directory (issue #14). Use ~/ under the home directory and // (absolute) elsewhere.
     home = Path.home()
     try:
-        relative = vault.relative_to(home)
+        relative = directory.relative_to(home)
     except ValueError:
-        return f"Edit(//{str(vault).lstrip('/')}/**)"
-    return "Edit(~/**)" if relative == Path(".") else f"Edit(~/{relative.as_posix()}/**)"
+        return f"{tool}(//{str(directory).lstrip('/')}/**)"
+    return f"{tool}(~/**)" if relative == Path(".") else f"{tool}(~/{relative.as_posix()}/**)"
+
+
+def permission_rule(vault: Path) -> str:
+    return path_rule("Edit", vault)
 
 
 def under_home_claude(vault: Path) -> bool:
@@ -135,6 +144,32 @@ def ineffective_reason(vault: Path) -> str | None:
     if RULE_SYNTAX.intersection(str(vault)):
         return "special-characters"
     return None
+
+
+# The scripts an arming run executes through Bash (issue #26): the main session resolves {VAULT},
+# the armorer assembles pack section 5. Each gets one allow rule so neither prompts.
+SESSION_SCRIPTS = ("resolve-vault.py", "assemble-pack.py")
+# Same set as assemble-pack.py: in an unquoted command these change the words or fail to parse.
+SHELL_SPECIAL = set("'\"`$\\;&|<>()[]{}*?!#~")
+
+
+def script_rules() -> dict:
+    # Bash rules match the command text, so the prefix is python3 plus this script's directory as
+    # invoked: symlinks are not resolved, exactly as assemble-pack.py --permission-rule does (#21).
+    # init runs this through the same {SCRIPTS_DIR} string the skill and the armorer type.
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    prefixes = {Path(name).stem: f"python3 {scripts_dir}/{name}" for name in SESSION_SCRIPTS}
+    # The session and the armorer Read {SKILL_DIR}/references/ (index.json, the modules), which
+    # sits outside the working directory for a plugin user and prompted on every Read (T16-before).
+    # {SKILL_DIR} is the skills/smartthink/ sibling of the same, unresolved {SCRIPTS_DIR}.
+    skill_dir = Path(os.path.dirname(scripts_dir)) / "skills" / "smartthink"
+    return {
+        "command_prefixes": prefixes,
+        "bash_rules": [f"Bash({prefix} *)" for prefix in prefixes.values()],
+        "bash_rules_effective": not any(char.isspace() or char in SHELL_SPECIAL for char in scripts_dir),
+        "read_rule": path_rule("Read", skill_dir),
+        "read_rule_effective": not RULE_SYNTAX.intersection(str(skill_dir)),
+    }
 
 
 def settings_path() -> Path | None:
@@ -415,6 +450,7 @@ def main() -> int:
         reason = ineffective_reason(vault)
         result["permission_rule_effective"] = reason is None
         result["permission_rule_reason"] = reason
+        result.update(script_rules())
     print(json.dumps(result, ensure_ascii=False))
     return 0
 
