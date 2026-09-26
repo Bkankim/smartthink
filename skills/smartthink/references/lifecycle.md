@@ -208,13 +208,38 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 
 - `true`일 때만 설치 여부를 **묻는다.**
 
+**Bash 조립 규칙 1개도 함께 제안한다(#21).** 팩 5절 원문은 armorer가 Bash로
+`python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir ... --modules ...`를 한 번 실행해 붙인다. Bash 호출은
+Edit 규칙 대상이 아니라서 이 명령만 따로 묻는다. 규칙 문자열도 **직접 만들지 말고 스크립트로 얻는다.**
+`python3 {SCRIPTS_DIR}/assemble-pack.py --permission-rule`이 출력한 JSON의 `permission_rule`이 넣을 규칙이다
+(이하 `<BASH_RULE>`, 모양은 `Bash(python3 <스크립트 절대경로> *)`). 대상 파일은 같은 `<SETTINGS>`다.
+
+- `<BASH_RULE>`은 armorer가 실제로 치는 명령의 앞부분과 글자 그대로 같아야 매칭된다. Claude Code는 Bash
+  규칙을 명령 문자열로 비교하고 끝의 ` *`가 나머지 인자(따옴표 포함)를 받는다. 경로를 손으로 줄이거나 `~`로 바꾸지 마라.
+- 스크립트는 **호출된 경로 그대로**(심링크를 풀지 않고) 규칙을 만든다. 그러니 `--permission-rule`은 경로 규약의
+  `{SCRIPTS_DIR}` 문자열 그대로, 무장 때 armorer에 Path Variables로 넘기는 것과 같은 문자열로 호출한다. 출력의
+  `command_prefix`가 armorer가 칠 명령의 앞부분이고 `<BASH_RULE>`은 `Bash(<command_prefix> *)`다. 따로 realpath로
+  바꾸면 `/tmp`처럼 조상이 심링크인 설치에서 규칙과 명령이 어긋나 매번 프롬프트가 뜬다.
+- 스크립트 출력의 `permission_rule_effective`가 `false`면(스크립트 경로에 공백이나 `(`·`$`·`;`·`*`·따옴표 같은
+  셸 특수 문자가 있음) 명령이 다른 단어로 쪼개지거나 파싱되지 않아 규칙이 매칭되지 않으니 제안하지 말고 그 이유만 알린다.
+- vault 위치와는 무관하다. vault가 `~/.claude` 아래라 Edit 규칙을 제안하지 않는 경우에도 `<BASH_RULE>`은
+  제안한다(스크립트가 여는 파일은 Claude Code 파일 권한 검사 대상이 아니다). 그때 Write 프롬프트는 남는다.
+- **위험을 함께 알린다.** 이 규칙이 있으면 그 경로의 스크립트는 인자와 무관하게 묻지 않고 실행된다. 스크립트는
+  `.../packs/<팩>/pack.md` 하나만, 9개 모듈 원문으로만 고쳐 쓰고 그 밖의 경로·모듈·심링크는 거부하지만,
+  그 파일을 고칠 수 있는 누군가가 있다면 그 사람의 코드가 무프롬프트로 돈다. 플러그인 업데이트로 경로가 바뀌면
+  규칙이 더는 매칭되지 않아 프롬프트가 돌아온다(`/st status`가 NG로 보여준다, init 재실행으로 갱신).
+
+묻는 문장(규칙마다 따로 승인받는다. 제안하지 않기로 한 규칙은 줄을 뺀다):
+
 ```
-백그라운드 에이전트가 vault에 팩을 쓸 때 권한 프롬프트가 뜬다.
-<SETTINGS>에 <RULE> 허용 규칙을 넣을까?
+백그라운드 에이전트가 vault에 팩을 쓸 때 권한 프롬프트가 뜬다. 아래 허용 규칙을 <SETTINGS>에 넣을까?
+  1) <RULE>        팩 파일 Write·Edit
+  2) <BASH_RULE>   팩 5절 원문 조립 스크립트 실행(이 스크립트만, 인자 무관 무프롬프트)
+둘 다 / 1만 / 2만 / 넣지 않음 중에 골라줘.
 거절해도 무장은 그대로 동작하고, 매번 승인 프롬프트가 뜰 뿐이야.
 ```
 
-- **승인했을 때만 기록한다.** 묻지 않고 쓰는 건 금지다.
+- **승인한 규칙만 기록한다.** 묻지 않고 쓰는 건 금지다.
 - 거절해도 아무 기능이 죽지 않는다는 걸 알려라. 압박하지 마라.
 
 `<SETTINGS>`는 **리포 밖 파일이다.** 쓰기 규율:
@@ -232,6 +257,9 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
    (`Edit(~/notes/smartthink)`, `Edit(~/notes/*)`) 하위 팩 파일과 매칭되지 않으므로 동등하지 않다.
    같은 vault를 가리키는 단일 `/` 형식 규칙이 남아 있으면 매칭되지 않는 규칙이라고 알리고, 지울지는
    사용자가 정한다.
+7. `<BASH_RULE>`도 같은 규율(1~5번)로 머지한다. 동등한 규칙은 `<BASH_RULE>` 자체이거나 같은 스크립트 절대경로에
+   끝이 `:*`인 옛 표기(`Bash(python3 <스크립트 절대경로>:*)`)다. 다른 경로의 `assemble-pack.py`를 가리키는 규칙은
+   동등하지 않다(옛 설치 경로일 수 있으니 알리고, 지울지는 사용자가 정한다).
 
 ### 5. 완료 보고
 
@@ -423,6 +451,7 @@ v2 형식(YAML 헤더 없음)이면 그 사실을 표시하고 "첫 `/st retain`
 | vault 해석 출처 | resolver 출력의 `source`(`env` / `pointer` / `default`) | NG 없음. `env`면 셸의 `SMARTTHINK_VAULT`가 포인터·기본값보다 우선한다고, `pointer`면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`가 가리킨 경로라고, `default`면 `${XDG_DATA_HOME:-~/.local/share}/smartthink`이라고 1줄 표시 |
 | vault 쓰기 가능 | **디렉터리 권한으로 판정**(`test -w {VAULT}`) | 팩·프로필·진화 상태가 기록되지 않음 |
 | 권한 규칙 | `resolve-vault.py --permission-rule`의 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)의 `permissions.allow`에 init 4절 6번의 동등한 규칙(`permission_rule` 자체, 또는 같은 vault나 상위 경로를 가리키는 `Edit(~/.../**)`·`Edit(//.../**)`)이 있으면 OK. 끝이 `/**`가 아닌 규칙이나 같은 vault를 단일 `/`로 가리키는 `Edit(/<절대경로>/**)`만 있으면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음: 백그라운드 Write마다 부모 세션에 승인 프롬프트가 뜸. 단일 `/` 형식: 설정 파일 기준 상대경로라 매칭 안 됨, init 재실행. `effective=false`: vault가 `~/.claude` 아래라 규칙으로 프롬프트를 못 없앰, `/st init` 재실행으로 ~/.claude 밖 경로를 고르거나 SMARTTHINK_VAULT로 지정하면 해소 |
+| 권한 규칙(Bash 조립) | `python3 {SCRIPTS_DIR}/assemble-pack.py --permission-rule`(`{SCRIPTS_DIR}`는 경로 규약 문자열 그대로)의 `permission_rule`과 같은 항목(또는 init 4절 7번의 동등한 `:*` 표기)이 `settings_path`의 `permissions.allow`에 있으면 OK. 없거나 다른 경로의 `assemble-pack.py`만 가리키면 NG. `permission_rule_effective`가 `false`면 규칙 유무와 무관하게 NG | 없음·다른 경로: 무장마다 armorer의 5절 조립 Bash에 승인 프롬프트가 뜸(플러그인 업데이트로 경로가 바뀐 경우 포함), `/st init` 재실행으로 설치. `effective=false`: 스크립트 경로에 공백·셸 특수 문자가 있어 규칙이 매칭되지 않음, 그런 문자가 없는 경로에 설치하면 해소 |
 | `references/index.json` | 파일 존재 | 게이트의 비용 추정이 사전 계산값 대신 실측 근사로 내려감 |
 | 검색 도구 | WebSearch·WebFetch 사용 가능 여부 | 팩 3절(리서치 합성) 생략, `manifest.research=false` |
 | `insane-search` 스킬 | Skill 목록에 존재 | WebFetch만 사용. 차단된 소스는 "차단"으로 표기하고 건너뜀 |
