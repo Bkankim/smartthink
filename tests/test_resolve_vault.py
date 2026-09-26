@@ -78,7 +78,19 @@ class ResolveVaultTest(unittest.TestCase):
 
         result = self.run_resolver("--ensure", vault_env=str(missing))
 
-        self.assertEqual(result, {"path": str(missing), "source": "env"})
+        # --ensure also reports what the arming gate needs (final-review of #26): whether the
+        # unquoted script calls can match the Bash rules (this checkout's path has no special
+        # characters) and whether the vault can be written.
+        self.assertEqual(
+            result,
+            {
+                "path": str(missing),
+                "source": "env",
+                "bash_rules_effective": True,
+                "bash_rules_reason": None,
+                "vault_writable": True,
+            },
+        )
         self.assertTrue((missing / "packs").is_dir())
         self.assertFalse(self.default_vault.exists())
 

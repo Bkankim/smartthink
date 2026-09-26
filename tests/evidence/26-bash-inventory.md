@@ -9,9 +9,10 @@
 
 | 줄 | 명령 | 처리 | 사유 |
 |---|---|---|---|
-| 35, 47 | `readlink {SKILL_DIR}` | 유지(묶음) | install.sh 설치에서만, 한 줄. T16-after 4절에서 무프롬프트 |
+| 35, 47 | `readlink {SKILL_DIR}` | 유지(묶음) | `{SKILL_DIR}`이 플러그인 밖 사용자 레벨 스킬 폴더일 때만(위치 무관, final-review 20260927-073516 #4), 한 줄. T16-after 4절에서 무프롬프트 |
+| 47 | armorer의 `date +%Y-%m-%dT%H:%M:%S%z`(manifest `created`) | 유지(묶음 밖, 무프롬프트) | 경로 없는 읽기 전용 한 단어 명령. T16-after의 모든 런(플러그인 2회, install.sh 2회)에서 프롬프트 0회. SKILL.md 47행 규율에 명시 |
 | 37, 47 | `python3 {SCRIPTS_DIR}/resolve-vault.py --ensure` | 유지(묶음) | resolver Bash 규칙 |
-| 290 | `wc -c`(index.json 부재 폴백) | **변환** → `python3 {SCRIPTS_DIR}/resolve-vault.py --module-sizes <모듈...>` | 3b995c4, final-review 20260927-064432 (a)1 |
+| 290 | `wc -c`(index.json 부재 폴백) | **변환** → `python3 {SCRIPTS_DIR}/resolve-vault.py --module-sizes <모듈...>` | 3b995c4, final-review 20260927-064432 (a)1  없는 이름은 null+경고, 나머지 계속(final-review 20260927-073516 #5) |
 | 425 | `python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir ... --modules ...`(5b 인라인) | 유지(묶음) | assemble-pack Bash 규칙 |
 | 622 | `uv`·`pip`(우아한 축소 표) | 유지(무장 측정 밖) | armorer의 리서치 의존성 설치 경로(`insane-search` 등)를 가리키는 한 단어 언급. 리서치 ON에서만 쓰이고 WebSearch·WebFetch와 함께 T16 측정 대상 밖이다 |
 | 35, 46, 48, 129, 403, 409, 425 | `ls`·`cat`·`grep`·`head`·`test`·`cd`·`git show`·`git log`, Bash로 env 읽기 | 금지 언급 | 같은 줄이 쓰지 말라고 지시한다 |

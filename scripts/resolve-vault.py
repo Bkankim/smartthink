@@ -27,12 +27,16 @@ assemble-pack.py, taken from the path this script was invoked by, symlinks not r
 "bash_rules_effective", and "read_rule" for the sibling skills/smartthink/ directory the session and
 the armorer Read, with "read_rule_effective"; "read_rules" adds the user-level skills/smartthink
 symlinks (install.sh) that resolve to that directory, since the session Reads through the link.
-"vault_writable" says whether the vault, or the nearest existing folder on its path, is a writable
-directory (what `st status` reports).
---module-sizes NAME... prints {"modules": {name: {"bytes", "est_tokens"}}} for files in the sibling
-skills/smartthink/references/, the gate's fallback when index.json is missing.
+"vault_writable" says whether the vault (or the nearest existing folder on its path) and an existing
+packs/ are writable directories (what `st status` reports).
+--module-sizes NAME... prints {"modules": {name: {"bytes", "est_tokens"} or null}} for files in the
+sibling skills/smartthink/references/, the gate's fallback when index.json is missing; a name that is
+not a plain file there is null with a warning on stderr, and the exit code stays 0.
 --ensure also creates packs/ and copies the evolution-state template when absent. profile.md is
 left to `st init`.
+--ensure also prints "bash_rules_effective" and "bash_rules_reason" (whether unquoted script calls can
+match the Bash rules) and "vault_writable" (the vault root and packs/ are writable), which the arming
+gate reads instead of the exit code.
 --candidates instead lists existing note stores under HOME for `st init` step 5 to offer: signals,
 last change, rough file count, git status and warnings per candidate, plus the create-new default.
 It reads folder names and mtimes only (never file contents) and never marks a candidate as chosen.
@@ -158,6 +162,16 @@ SESSION_SCRIPTS = ("resolve-vault.py", "assemble-pack.py")
 SHELL_SPECIAL = set("'\"`$\\;&|<>()[]{}*?!#~")
 
 
+def bash_rules_status() -> dict:
+    # Whether the unquoted `python3 {SCRIPTS_DIR}/<script>` form can match a prefix rule. With
+    # whitespace or a shell special character in the path the session must quote the script path
+    # (or it splits into other words), and a quoted command never matches the rule, so the rule is
+    # not effective and each call prompts (final-review of #26 #1).
+    scripts_dir = os.path.dirname(os.path.abspath(__file__))
+    special = any(char.isspace() or char in SHELL_SPECIAL for char in scripts_dir)
+    return {"bash_rules_effective": not special, "bash_rules_reason": "special-characters" if special else None}
+
+
 def script_rules() -> dict:
     # Bash rules match the command text, so the prefix is python3 plus this script's directory as
     # invoked: symlinks are not resolved, exactly as assemble-pack.py --permission-rule does (#21).
@@ -168,13 +182,15 @@ def script_rules() -> dict:
     # sits outside the working directory for a plugin user and prompted on every Read (T16-before).
     # {SKILL_DIR} is the skills/smartthink/ sibling of the same, unresolved {SCRIPTS_DIR}.
     skill_dir = Path(os.path.dirname(scripts_dir)) / "skills" / "smartthink"
+    read_dirs = (skill_dir, *linked_skill_dirs(skill_dir))
     return {
         "command_prefixes": prefixes,
         "bash_rules": [f"Bash({prefix} *)" for prefix in prefixes.values()],
-        "bash_rules_effective": not any(char.isspace() or char in SHELL_SPECIAL for char in scripts_dir),
+        **bash_rules_status(),
         "read_rule": path_rule("Read", skill_dir),
-        "read_rules": [path_rule("Read", path) for path in (skill_dir, *linked_skill_dirs(skill_dir))],
-        "read_rule_effective": not RULE_SYNTAX.intersection(str(skill_dir)),
+        "read_rules": [path_rule("Read", path) for path in read_dirs],
+        # Every listed path counts: a link path like ~/claude[work]/skills/smartthink never matches.
+        "read_rule_effective": not any(RULE_SYNTAX.intersection(str(path)) for path in read_dirs),
     }
 
 
@@ -204,10 +220,14 @@ def module_sizes(names: list[str]) -> dict:
     # session used to measure files with Bash `wc -c`, a command no allow rule covers. This script
     # already has one, so it reports the sizes. Only plain file names inside references/ are read.
     references = Path(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) / "skills" / "smartthink" / "references"
-    modules = {}
+    # A name that is not a plain file there comes back as null with a warning, so one bad name does
+    # not cost the gate the other estimates (final-review of #26 #5).
+    modules: dict[str, dict | None] = {}
     for name in names:
         if Path(name).name != name or not (references / name).is_file():
-            raise ValueError(f"not a file in {references}: {name}")
+            print(f"warning: not a file in {references}: {name}", file=sys.stderr)
+            modules[name] = None
+            continue
         size = (references / name).stat().st_size
         modules[name] = {"bytes": size, "est_tokens": round(size / TOKEN_DIVISOR)}
     return {"modules": modules}
@@ -217,6 +237,10 @@ def vault_writable(vault: Path) -> bool:
     # `st status` used Bash `test -w {VAULT}`, a command outside the rule bundle (final-review of
     # #26). Judged on the nearest existing ancestor, as install.sh does: a vault not created yet is
     # writable when the folder it would be created in is.
+    # The armorer writes under packs/, so an existing packs/ must be writable too (final-review #2).
+    packs = vault / "packs"
+    if os.path.lexists(packs) and not (os.path.isdir(packs) and os.access(packs, os.W_OK)):
+        return False
     base = str(vault)
     while base and not os.path.lexists(base):
         base = os.path.dirname(base)
@@ -491,11 +515,7 @@ def main() -> int:
     )
     arguments = parser.parse_args()
     if arguments.module_sizes:
-        try:
-            print(json.dumps(module_sizes(arguments.module_sizes), ensure_ascii=False))
-        except ValueError as error:
-            print(f"error: {error}", file=sys.stderr)
-            return 1
+        print(json.dumps(module_sizes(arguments.module_sizes), ensure_ascii=False))
         return 0
     if arguments.candidates:
         print(json.dumps(candidates(arguments.time_limit), ensure_ascii=False))
@@ -508,6 +528,10 @@ def main() -> int:
             print(f"error: cannot prepare vault {vault}: {error}", file=sys.stderr)
             return 1
     result = {"path": str(vault), "source": source}
+    if arguments.ensure:
+        result.update(bash_rules_status())
+        # --ensure exits 0 on an existing read-only vault, so the arming gate reads this instead.
+        result["vault_writable"] = vault_writable(vault)
     if arguments.permission_rule:
         result["permission_rule"] = permission_rule(vault)
         target = settings_path()

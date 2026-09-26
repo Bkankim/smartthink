@@ -95,3 +95,45 @@ E               AssertionError: 0 != 1 : PASS A. layout: required paths exist
 E               40 passed, 0 failed, 5 skipped
 E               pack: 0 passed, 0 failed, 5 skipped
 ```
+
+## final-review 20260927-073516 후속 (마지막)
+
+리뷰가 남긴 미커밋 패치 01~03을 역순으로 되돌린 뒤 사이클마다 red부터 다시 했다.
+
+### S2-7 `--ensure`·`--permission-rule`이 `bash_rules_effective`와 `bash_rules_reason`을 낸다(#1)
+
+```
+E               KeyError: 'bash_rules_reason'
+tests/test_permission_bundle.py:76: KeyError
+2 failed, 1 passed, 7 deselected in 0.07s
+```
+
+### S2-8 `--ensure`가 `vault_writable`을 내고, 루트와 packs/ 둘 다 쓰기 가능해야 true다(#2)
+
+```
+E       KeyError: 'vault_writable'
+tests/test_permission_bundle.py:189: KeyError
+1 failed, 8 deselected in 0.04s
+```
+
+### S2-9 `read_rule_effective`가 `read_rules`의 링크 경로까지 본다(#3)
+
+```
+E       AssertionError: True is not False
+tests/test_permission_bundle.py:163: AssertionError
+1 failed, 9 deselected in 0.07s
+```
+
+### S2-10 `--module-sizes`가 없는 이름은 null과 경고로 내고 나머지를 계속 잰다, exit 0(#5)
+
+```
+E               AssertionError: 1 != 0 : error: not a file in <ROOT>/plugin/skills/smartthink/references: ../scripts/resolve-vault.py
+tests/test_permission_bundle.py:253: AssertionError
+E               AssertionError: 1 != 0 : error: not a file in <ROOT>/plugin/skills/smartthink/references: missing.md
+```
+
+### green 확인 (마지막 후속)
+
+- S2-7~S2-10 구현 뒤 `uv run --with pytest pytest -q tests` → `104 passed, 66 subtests passed`, `python3 scripts/check-structure.py` exit 0.
+- `tests/test_resolve_vault.py`의 `--ensure` 정확 일치 테스트는 의도된 출력 확장(`bash_rules_effective`·`bash_rules_reason`·`vault_writable`)을 포함하도록 갱신했다.
+- #4(readlink 조건 일반화)·#6(규율 문장의 묶음 명령 나열)은 문서 변경이라 테스트 대상이 아니다. check-structure D 세 검사가 새 문장을 통과한다.
