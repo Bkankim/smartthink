@@ -84,7 +84,7 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세션을 썼을 때
 ```
 
-## 3. 게이트 T1~T15
+## 3. 게이트 T1~T16
 
 ### T1. `/st init` 신규 프로필
 
@@ -336,6 +336,21 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 - **증거**: `T15-prompt-observation.md`(환경·픽스처·settings 전후·포인터·프롬프트 순서 기록·판정), `T15-transcript.md`(⑤ 화면 원문, 세션별 도구 호출 목록과 Base directory, 무장 마지막 화면), `T15-candidates.json`(가짜 홈 `--candidates` 출력).
 - **단위 대체 검증**: `tests/test_resolve_vault.py`의 `CandidatesTest`가 같은 실제 사례 픽스처와 제외 규칙·경고·자동 선택 필드 부재를 매번 검증한다.
 
+### T16. 무장 전 과정 권한 프롬프트 0회
+
+- **목적**: init이 제안하는 규칙 묶음을 모두 승인한 default 권한 모드 새 세션에서, 메인 세션과 armorer를 합쳐 무장 전 과정의 권한 프롬프트가 0회인지 확인한다(이슈 #26). Read·Glob·Bash가 측정 대상이다.
+- **사전 조건**: 2절의 격리 설정 세션 + 가짜 `HOME`, 작업 디렉터리는 가짜 홈 안의 빈 프로젝트 폴더(플러그인 디렉터리와 vault가 둘 다 작업 디렉터리 밖이다. 워크트리를 작업 디렉터리로 쓰면 스킬 디렉터리 Read가 드러나지 않는다).
+  - `XDG_DATA_HOME`·`XDG_CONFIG_HOME`·`SMARTTHINK_VAULT`를 지운다. vault는 init ⑤에서 가짜 홈의 노트 보관소 후보를 골라 포인터로 정한다.
+  - 격리 `settings.json`의 allow에는 측정 대상이 아닌 `WebSearch`·`WebFetch`·`Skill`·`Agent`만 넣는다. `Read`·`Glob`·`Grep`·`Bash`는 사전 허용하지 않는다. deny에는 실제 홈 vault·포인터 경로를 `//<실제 홈>/...`로 넣는다.
+  - 가짜 홈은 `mktemp -d`의 실경로 아래에 둔다(Claude Code 자신의 임시 디렉터리 `/tmp/claude-<uid>/` 아래는 피한다).
+- **입력**: `/smartthink:smartthink init`(인터뷰는 건너뛰고 ⑤·규칙 설치만 승인) → 세션을 닫고 새 세션에서 `/smartthink:smartthink --digest --nosearch <주제>` 1회 → 다시 새 세션에서 `/smartthink:smartthink --nosearch <주제>` 1회(원문 5절, assemble-pack 경유).
+- **통과 기준**:
+  - init 4절이 `resolve-vault.py --permission-rule` 한 번의 출력으로 `Edit`(vault)·`Read`(스킬 디렉터리)·`Bash` 2개(resolve-vault, assemble-pack)를 묻고 승인분만 보존 머지한다.
+  - 두 무장 세션 모두 권한 프롬프트 0회(도구별 표). 메인 세션의 Bash는 `python3 <SCRIPTS_DIR>/resolve-vault.py --ensure` 한 줄뿐이고, 확인은 Read·Glob이다.
+  - 프롬프트가 남으면 원인과 근거를 적고 환경 의존이면 BLOCKED 부분 판정한다.
+- **증거**: `T16-before.md`(수정 전 main 코드 재현, 프롬프트 표·가설 판정), `T16-after.md`(init 제안 원문·settings 전후·세션별 도구 호출과 Base directory·프롬프트 표).
+- **단위 대체 검증**: `tests/test_permission_bundle.py`(규칙 묶음과 문서 호출 문자열 일치), `tests/test_check_structure_bash.py`(세션 문서의 복합 명령 FAIL).
+
 ## 4. 실측 기록
 
 아래 표는 실행 중 답이 나온 즉시 채운다. 추정이나 과거 지식으로 채우지 않는다.
@@ -380,3 +395,4 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 | T14 | BLOCKED | 2026-09-26 | T14-output.txt, T14-blocked.md | 격리 HOME에 권한 허용 규칙이 없어 `-p` 자식의 resolver 호출 8회가 전부 승인 대기로 거부, 팩 미생성. resolver 단위 출력 source=env, 실제 기본 vault `find -newer` 비어 있음. 자식이 /tmp·리포 안에 vault 즉흥 생성 시도(거부) → SKILL.md에 금지 명시. 복합 명령 호출은 절대경로 한 줄로 교체 |
 | T15 | PASS | 2026-09-27 | T15-prompt-observation.md, T15-transcript.md, T15-candidates.json | #20 실측(브랜치 st-20-vault-location, Claude Code 2.1.283, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`, 가짜 `HOME` + XDG 변수 제거). ⑤에 후보 3개(안 쓰는 기본 vault `nearly-empty`, 리포 30개 작업 폴더 `workspace-root`, 이름 신호만 있는 진짜 보관소)와 새로 만들기·직접 입력이 자동 선택 없이 떴다. 3번 선택 → `<보관소>/smartthink/`, `.gitignore`에 `smartthink/packs/`, 포인터 `~/.config/smartthink/vault-pointer`(가짜 홈), `Edit(~/<보관소>/smartthink/**)` 설치. 새 세션 무장에서 armorer의 pack.md Write가 프롬프트 없이 성공(vault Write/Edit 프롬프트 0회). Bash 프롬프트 12회(heredoc으로 쓴 5·6절·manifest.json 포함)는 #21 소관으로 기록만 |
 | T15 | PASS | 2026-09-27 | T15-rerun.md, T15-protected-probe.md | final-review 20260927-032439 후속 재실측(브랜치 st-20-vault-location 1b01df4, #21 병합 포함, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`, 가짜 `HOME`, 읽기 도구 사전 허용 원문 기록). init이 ⑤ 확정 전에 기본 위치를 만들지 않았고(빈 폴더 잔존 해소), 후보 3개 자동 선택 없이 제시 → 3번 → 포인터·`.gitignore` → `Edit` + `assemble-pack` Bash 규칙 설치. 새 세션 무장 2회(`--digest`, 원문 1모듈)에서 pack.md·manifest.json Write와 assemble-pack Bash 모두 무프롬프트(vault 쓰기 관련 프롬프트 0회). 남은 7회는 cwd 밖을 읽는 복합 읽기 Bash |
+| T16 | PASS | 2026-09-27 | T16-before.md, T16-after.md | #26 실측(브랜치 fix-26-main-bash-prompts, Claude Code 2.1.283, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`, 가짜 `HOME`, 작업 디렉터리가 플러그인·vault 밖, Read·Glob·Bash 사전 허용 없음). 수정 전 main 코드는 init 규칙 2개 설치 상태에서 무장 1회에 10회(스킬 디렉터리 Read 9, resolver Bash 1). 수정 후 init이 `resolve-vault.py --permission-rule` 한 번의 출력으로 Edit(vault)·Read(스킬 디렉터리)·Bash 2개를 묻고 승인분을 보존 머지, 새 세션 무장 2회(`--digest`, 원문)에서 메인·armorer 합계 0회. 메인 Bash는 resolver 한 줄뿐, 확인은 Read·Glob. 팩 `--pack` H 5/5 두 개. final-review 후속(3b995c4): install.sh 설치(가짜 HOME)에서 링크 경로 Read가 체크아웃 경로 규칙과 어긋나 9회 → `read_rules`에 링크 경로 규칙을 더해 0회 |

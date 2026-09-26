@@ -32,12 +32,20 @@ description: >
 본문과 모든 레퍼런스 문서의 경로 플레이스홀더는 아래로 해석하라.
 
 - `{SKILL_DIR}` - 이 SKILL.md가 있는 디렉터리. `${CLAUDE_SKILL_DIR}` 환경변수가 실제 경로로 해석되면 그 값을 쓰고, 미해석(빈 문자열이거나 리터럴 `${CLAUDE_SKILL_DIR}` 그대로)이면 **이 SKILL.md 파일의 실제 위치에서 추론하라.**
-- `{SCRIPTS_DIR}` - 심링크를 푼 `{SKILL_DIR}`의 두 단계 위 `scripts/`의 **절대경로**. `{SKILL_DIR}`이 심링크면(install.sh 설치) 먼저 `readlink`로 실제 위치를 구한다. 스크립트는 명령 치환 없이 절대경로 한 줄로 호출하라(`$(...)`·`&&`가 섞인 복합 명령은 매번 권한 승인이 필요하다). 작업 디렉터리 기준 상대경로 `scripts/`를 쓰지 마라.
+- `{SCRIPTS_DIR}` - `{SKILL_DIR}`의 두 단계 위 `scripts/`의 **절대경로**. `{SKILL_DIR}` 끝의 `/skills/smartthink`를 `/scripts`로 바꾼 문자열이다. 플러그인 설치는 `{SKILL_DIR}`이 실제 디렉터리이므로 도구 호출 없이 이 문자열을 그대로 쓴다(`readlink`·`ls`로 확인하지 마라). `{SKILL_DIR}`이 플러그인 밖 사용자 레벨 스킬 폴더(`~/.claude/skills/smartthink`, `$CLAUDE_CONFIG_DIR/skills/smartthink` 등 위치 무관, install.sh는 심링크로 설치한다)면 Bash로 `readlink {SKILL_DIR}` **한 줄**을 실행한다. 출력이 있으면 심링크이므로 그 실제 위치(상대경로면 `{SKILL_DIR}`의 부모 기준)에서 만들고, 출력이 없으면 심링크가 아니므로 `{SKILL_DIR}` 그대로 쓴다. 심링크를 풀지 않고 문자열로 만들면 `~/.claude/scripts`처럼 없는 경로가 되어 스크립트가 실행되지 않는다. 작업 디렉터리 기준 상대경로 `scripts/`를 쓰지 마라.
 - `{VAULT}` - **resolver를 Bash로 실행해 나온 path만 쓴다. 해석하지 마라.**
-  `python3 "{SCRIPTS_DIR}/resolve-vault.py" --ensure`가 출력한 JSON의 `path`가 `{VAULT}`다. `--ensure`가 `packs/`와 빈 `evolution-state.md`를 만든다(`profile.md`는 만들지 않는다). 우선순위·폴백 규칙의 정본은 그 스크립트다. 디렉터리가 비어 있다거나 테스트용처럼 보인다는 이유로 다른 경로를 고르지 마라.
+  `python3 {SCRIPTS_DIR}/resolve-vault.py --ensure`가 출력한 JSON의 `path`가 `{VAULT}`다. 이 명령도 아래 [세션 도구 규율](#세션-도구-규율)대로 따옴표 없는 절대경로 한 줄로 친다. `--ensure`가 `packs/`와 빈 `evolution-state.md`를 만든다(`profile.md`는 만들지 않는다). 우선순위·폴백 규칙의 정본은 그 스크립트다. 디렉터리가 비어 있다거나 테스트용처럼 보인다는 이유로 다른 경로를 고르지 마라.
   - **resolver 실행이 권한 거부·오류로 실패하면 다른 경로를 만들지 마라.** 임시 디렉터리나 리포 안에 vault를 새로 만드는 것도 폴백이다. 팩 파일 없이 인라인 응답으로 대체하고, 실패한 명령과 이유를 브리핑 첫 줄에 보고한다.
   - **Bash가 없는 하네스(인라인 경로)만** 직접 정한다: `$SMARTTHINK_VAULT`가 비어 있지 않으면 그 경로 → 아니면 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`의 첫 줄 절대경로 → 아니면 `${XDG_DATA_HOME:-~/.local/share}/smartthink`(XDG 변수는 절대경로일 때만 쓴다). `~/.claude` 아래의 옛 위치는 보지 않는다. **설정된 env vault는 비어 있거나 없어도 그대로 쓴다. 폴백 금지.** 없으면 `packs/`를 만들어 시드한다.
 - 팩 경로 - `{VAULT}/packs/<YYYY-MM-DD>-<슬러그>/`
+
+### 세션 도구 규율
+
+`{SKILL_DIR}`과 `{VAULT}`는 보통 작업 디렉터리 밖이다. `/st init`이 설치하는 허용 규칙 묶음(vault Edit, 스킬 디렉터리 Read, `resolve-vault.py`·`assemble-pack.py` Bash)은 아래 모양의 호출만 덮는다. 모양이 다르면 규칙과 무관하게 호출마다 권한 프롬프트가 뜬다(`tests/evidence/T16-before.md`).
+
+- **파일 읽기는 Read, 존재 확인은 Glob으로 한다.** `ls`·`cat`·`grep`·`head`·`test` 같은 확인용 Bash를 쓰지 마라. 작업 디렉터리 밖을 읽는 Bash는 허용 규칙이 있어도 매번 묻는다. vault의 Read·Glob은 vault Edit 규칙이, `{SKILL_DIR}`의 Read는 스킬 디렉터리 Read 규칙이 덮는다.
+- **무장 중 Bash는 규칙 묶음의 아래 명령뿐이다.** 메인 세션: `python3 {SCRIPTS_DIR}/resolve-vault.py --ensure`(항상 1회), `python3 {SCRIPTS_DIR}/resolve-vault.py --module-sizes <모듈...>`(index.json이 없을 때만), `python3 {SCRIPTS_DIR}/assemble-pack.py ...`(5b 인라인 경로에서만), 사용자 레벨 스킬 폴더면 위 `readlink {SKILL_DIR}` 1회. armorer: `python3 {SCRIPTS_DIR}/assemble-pack.py ...` 1회(manifest `created`용 `date` 한 줄은 경로 없는 읽기 전용 명령이라 프롬프트가 없다). 이 밖의 Bash는 쓰지 마라.
+- 스크립트는 `python3 {SCRIPTS_DIR}/<스크립트> <인자>` 모양으로 **따옴표 없이 절대경로 한 줄**로 호출한다. 이 앞부분이 허용 규칙의 접두어다. 예외: `{SCRIPTS_DIR}`에 공백이나 셸 특수 문자가 없으면(resolver 출력 `bash_rules_effective: true`) 이 모양 그대로 쓰고, 있으면(`false`) 스크립트 경로만 큰따옴표로 감싼다(경로에 `$`·백틱·`\`가 있으면 작은따옴표). 감싸지 않으면 경로가 여러 단어로 쪼개져 실행되지 않는다. 감싼 명령은 규칙 접두어와 달라 호출마다 승인 프롬프트가 뜨고, 그 경우는 감수한다. `;`·`&&`·`||`·파이프·`cd`·리다이렉션·`$(...)`를 섞지 말고, 명령 두 개가 필요하면 Bash 호출을 두 번 한다.
 
 ---
 
@@ -105,7 +113,7 @@ description: >
 | 검색 도구 | WebSearch·WebFetch 가용 여부 | 없으면 리서치 OFF로 고정하고 게이트에 표시 |
 | `insane-search` 스킬 | Skill 목록에 있는가 | 없으면 WebFetch만. 차단 소스는 "차단"으로 표기하고 건너뜀 |
 | `{SKILL_DIR}` | `${CLAUDE_SKILL_DIR}` 해석 여부 | 미해석이면 SKILL.md 위치에서 추론 |
-| `{VAULT}` 쓰기 | 경로 존재·쓰기 가능 여부 | 없으면 시드 생성. profile 없으면 브리핑에 `/st init` 안내 |
+| `{VAULT}` 쓰기 | resolver `--ensure` 출력의 `vault_writable`이 `true`여야 쓰기 가능이다(vault 루트와 `packs/` 둘 다. 종료 코드 0만으로는 부족하다, 읽기 전용 vault도 0으로 끝난다). Bash로 따로 확인하지 마라. `false`면 resolver 실패와 같이 팩 없이 인라인 응답으로 대체하고 브리핑 첫 줄에 vault 쓰기 불가를 사유로 보고한다 | `--ensure`가 시드를 만든다. profile은 1단계 Read가 실패하면 없는 것이다. 없으면 브리핑에 `/st init` 안내 |
 | 대화 여부 | 아래 [헤드리스 판별](#헤드리스-판별) 절차 | 헤드리스면 게이트 자동 진행, 상한 120K. **게이트에서 턴을 끝내지 않는다** |
 
 ### 헤드리스 판별
@@ -279,7 +287,7 @@ Agent 도구가 없는 하네스(Codex 등)에서 메인이 직접 수행하는 
 
 **레퍼런스 크기**는 `{SKILL_DIR}/references/index.json`에서 읽는다. 빌드 시 생성되며 각 레퍼런스의 바이트 크기와 `bytes / 2.2` 근사 토큰이 들어 있다.
 
-- **index.json이 없으면**: 선택 모듈 파일의 크기를 직접 재고(`wc -c`) 같은 계수(`bytes / 2.2`)로 근사하라. 게이트 4항목에 `※ index.json 없음, 실측 근사`를 덧붙여라.
+- **index.json이 없으면**: `python3 {SCRIPTS_DIR}/resolve-vault.py --module-sizes <모듈 파일명...>` 한 줄로 선택 모듈 파일의 실측 크기와 같은 계수(`bytes / 2.2`)의 근사 토큰을 받는다(init 규칙 묶음의 resolver 규칙이 덮는다. `wc -c` 같은 Bash로 재지 마라). 게이트 4항목에 `※ index.json 없음, 실측 근사`를 덧붙여라. 출력에서 `null`인 모듈(파일이 없거나 이름이 잘못됨, 경고가 stderr에 나온다)은 그 모듈만 비용을 `?`로 두고 게이트에 그 사실을 1줄 적은 뒤 나머지로 계속한다.
 - **리서치·합성은 고정 상수 15K**로 잡는다. 검색 라운드 수로 변주하지 마라.
 
 계산:
@@ -392,7 +400,7 @@ Agent 도구에 `run_in_background` 파라미터가 없는 하네스가 있다. 
 
 **armorer는 팩 파일을 Write하고 manifest 요약만 반환한다.** 팩 본문을 반환값으로 받지 마라. 본문이 반환값으로 돌아오면 armorer 창에서 소화하기로 한 원문이 메인 컨텍스트에 두 번 실린다.
 
-반환에서 확인할 것: 팩 디렉터리 경로, 실제 포함 모듈, 리서치 수행 여부, 실제 추정 토큰. 게이트에서 표시한 값과 크게 다르면 6단계 브리핑 말미에 차이를 1줄로 알려라.
+반환에서 확인할 것: 팩 디렉터리 경로, 실제 포함 모듈, 리서치 수행 여부, 실제 추정 토큰. 게이트에서 표시한 값과 크게 다르면 6단계 브리핑 말미에 차이를 1줄로 알려라. 팩 파일 존재는 Glob(`{팩 디렉터리}/*`)으로, 절 구조는 6단계의 pack.md Read 결과로 확인한다. `ls`·`grep` 같은 Bash로 확인하지 마라([세션 도구 규율](#세션-도구-규율)).
 
 **위반 조건**: 반환된 팩 디렉터리에 `pack.md`나 `manifest.json`이 없거나(팩 파일 부재), `pack.md`의 절 제목이 [팩 명세](#팩-명세)의 6개 문자열과 다르면(절 구조 불일치) 반환 규약 위반이다. `무장 실패: <사유>` 반환도 팩 파일 부재로 본다. 위반이면 [이름 해석 규칙](#에이전트-이름-해석-규칙)대로 폴백 사슬의 다음 단계로 내려간다.
 
@@ -617,7 +625,7 @@ digest 모드에서도 마커는 필수다. `sha256` 필드도 END 마커도 없
 | `${CLAUDE_SKILL_DIR}` 미해석 | SKILL.md 위치에서 추론 |
 | `references/index.json` 없음 | 파일 크기 실측 후 `bytes/2.2` 근사. 게이트에 "실측 근사" 표기 |
 | `references/lifecycle.md` 없음 | 서브커맨드 중단 후 알림. 추측 실행 금지 |
-| 권한 프롬프트(백그라운드 Write) | 부모 세션에 뜬다. `init`이 vault 쓰기 허용 규칙 설치를 제안 |
+| 권한 프롬프트(백그라운드 Write, 스킬 디렉터리 Read, 스크립트 Bash) | 부모 세션에 뜬다. `init`이 허용 규칙 묶음 설치를 제안([세션 도구 규율](#세션-도구-규율)) |
 | 헤드리스([판별](#헤드리스-판별)) | 게이트 자동 진행, 상한 120K. 게이트에서 턴을 끝내지 않음 |
 
 ---
