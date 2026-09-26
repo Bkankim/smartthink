@@ -290,3 +290,4 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 | T11 | PASS | 2026-09-08 | T11-skills.txt, T11-transcript.md, T11-observation.md | 실제 호출 이름 `/smartthink:smartthink`. `/st`·`/smartthink`·`/smartthink:st`는 전역 v2로 감. agents 등록 필드 불필요 |
 | T12 | PASS | 2026-09-08 | T12-output.txt, T12-manifest.json, T12-pack.md | run1(문서 원문)은 Not logged in exit 1(중첩 자식 인증). run2(`CLAUDE_CODE_OAUTH_TOKEN` 주입)에서 자동 진행·120K 상한·절삭 출력·턴 종료. 헤드리스도 `/st`가 v2를 먼저 열고 스스로 v3 재호출 |
 | T13 | BLOCKED | 2026-09-08 | T13-blocked.md | codex exec에서 `/smartthink` 미등록(자유 텍스트로 처리). cwd가 리포라 SKILL.md를 읽어 게이트만 출력, 인라인 안내문 없음, 팩 없음 |
+| T14 | BLOCKED | 2026-09-26 | T14-output.txt, T14-blocked.md | 격리 HOME에 권한 허용 규칙이 없어 `-p` 자식의 resolver 호출 8회가 전부 승인 대기로 거부, 팩 미생성. resolver 단위 출력 source=env, 실제 기본 vault `find -newer` 비어 있음. 자식이 /tmp·리포 안에 vault 즉흥 생성 시도(거부) → SKILL.md에 금지 명시. 복합 명령 호출은 절대경로 한 줄로 교체 |

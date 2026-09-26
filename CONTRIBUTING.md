@@ -123,9 +123,13 @@ Never commit a filled-in `profile.md` or `evolution-state.md`.
 
 ## Testing
 
-There is no automated end-to-end suite: the pipeline runs inside a live agent session, and the
-things worth testing are behavioral (does the gate appear, does the turn actually end, does the
-fallback engage when an agent definition is missing).
+The scripts have unit tests: `python3 -m unittest discover -s tests -p 'test_*.py'` covers the vault
+resolver, the migration target, and the installers against leftovers. They run against a temporary
+`HOME` only and never touch your real `~/.claude`.
+
+There is no automated end-to-end suite for the skill itself: the pipeline runs inside a live agent
+session, and the things worth testing are behavioral (does the gate appear, does the turn actually
+end, does the fallback engage when an agent definition is missing).
 
 `tests/gates.md` holds the scenarios, their pass criteria, and the evidence each one requires. Run
 them by hand and drop the evidence in `tests/evidence/` as files, named for the scenario. A PR that

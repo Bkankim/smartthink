@@ -28,6 +28,20 @@ class ResolveVaultTest(unittest.TestCase):
     def tearDown(self) -> None:
         self._tmp.cleanup()
 
+    def run_resolver_raw(self, *args: str, vault_env: str | None = None) -> subprocess.CompletedProcess[str]:
+        env = {key: value for key, value in os.environ.items() if key != "SMARTTHINK_VAULT"}
+        env["HOME"] = str(self.home)
+        if vault_env is not None:
+            env["SMARTTHINK_VAULT"] = vault_env
+        return subprocess.run(
+            [sys.executable, str(RESOLVER), *args],
+            env=env,
+            cwd=self.root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
     def run_resolver(self, *args: str, vault_env: str | None = None) -> dict:
         env = {key: value for key, value in os.environ.items() if key != "SMARTTHINK_VAULT"}
         env["HOME"] = str(self.home)
@@ -87,6 +101,18 @@ class ResolveVaultTest(unittest.TestCase):
         result = self.run_resolver(vault_env="   ")
 
         self.assertEqual(result, {"path": str(self.default_vault), "source": "default"})
+
+    def test_relative_env_vault_is_used_with_a_warning(self) -> None:
+        completed = self.run_resolver_raw(vault_env="rel-vault")
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertEqual(json.loads(completed.stdout), {"path": str(self.root / "rel-vault"), "source": "env"})
+        self.assertIn("relative", completed.stderr)
+
+    def test_blank_env_warns_that_it_is_ignored(self) -> None:
+        completed = self.run_resolver_raw(vault_env="   ")
+
+        self.assertIn("blank", completed.stderr)
 
     def test_default_when_nothing_is_set(self) -> None:
         result = self.run_resolver()

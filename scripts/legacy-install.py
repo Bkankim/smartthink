@@ -10,8 +10,8 @@ is shared by install.sh, uninstall.sh and `/st status`.
   migrate   move every leftover under ~/.claude/.backup/smartthink-legacy-<timestamp>/,
             keeping its path relative to ~/.claude. Nothing is deleted.
 
-Only files that identify themselves as SmartThink are leftovers. Symlinks are never leftovers:
-the installers already own and replace them.
+Only files that identify themselves as SmartThink are leftovers. Symlinks are left to the
+installers, which own and replace them, except a link to the removed agent in another checkout.
 """
 from __future__ import annotations
 
@@ -26,8 +26,9 @@ SMARTTHINK_MARK = re.compile(r"smartthink", re.IGNORECASE)
 ALIAS_MARK = re.compile(r"alias for /smartthink|smartthink alias", re.IGNORECASE)
 # The current skill spawns st-armorer; a SKILL.md without it predates v3.
 CURRENT_SKILL_MARK = "st-armorer"
-# Agents a copy install could have left. The second one was removed in v3 (folded into st-armorer).
-AGENT_NAMES = ("st-thinker", "st-searcher")  # st-searcher: removed agent, listed only to detect it
+# Agents a copy install could have left, and the agent removed in v3 (folded into st-armorer).
+REMOVED_AGENT = "st-searcher"  # removed in v3, named only to detect leftovers
+AGENT_NAMES = ("st-thinker", REMOVED_AGENT)
 
 
 def claude_dir() -> Path:
@@ -56,13 +57,25 @@ def is_real(path: Path) -> bool:
 def detect(base: Path) -> list[tuple[Path, str]]:
     found: list[tuple[Path, str]] = []
     skill = base / "skills" / "smartthink"
-    if is_real(skill) and skill.is_dir() and CURRENT_SKILL_MARK not in read(skill / "SKILL.md"):
+    skill_text = read(skill / "SKILL.md")
+    if (
+        is_real(skill)
+        and skill.is_dir()
+        and SMARTTHINK_MARK.search(skill_text)
+        and CURRENT_SKILL_MARK not in skill_text
+    ):
         found.append((skill, "copied skill directory from a release before v3"))
     for name in AGENT_NAMES:
         agent = base / "agents" / f"{name}.md"
         text = read(agent)
         if is_real(agent) and frontmatter_name(text) == name and SMARTTHINK_MARK.search(text):
             found.append((agent, f"copied {name} agent definition"))
+    # A symlink into another, still-present v2 clone keeps the removed agent listed. The
+    # installers only replace links they own, so this one is moved like a copied file.
+    removed = base / "agents" / f"{REMOVED_AGENT}.md"
+    text = read(removed)
+    if removed.is_symlink() and frontmatter_name(text) == REMOVED_AGENT and SMARTTHINK_MARK.search(text):
+        found.append((removed, f"link to the removed {REMOVED_AGENT} agent in another checkout"))
     command = base / "commands" / "st.md"
     if is_real(command) and ALIAS_MARK.search(read(command)):
         found.append((command, "copied /st alias"))

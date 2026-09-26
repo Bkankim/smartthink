@@ -98,6 +98,34 @@ class InstallTest(InstallerTestCase):
         self.assertFalse((self.claude / "commands" / "st.md").exists())
         self.assertEqual((self.claude / "agents" / "st-thinker.md").read_text(encoding="utf-8"), own)
 
+    def test_unmarked_skill_directory_is_not_a_leftover(self) -> None:
+        # Someone else's skill that happens to share the name is never moved.
+        skill = self.claude / "skills" / "smartthink"
+        skill.mkdir()
+        (skill / "SKILL.md").write_text("---\nname: other\n---\nnot ours\n", encoding="utf-8")
+
+        completed = self.run_script(INSTALL, "--migrate-legacy")
+
+        self.assertEqual(completed.returncode, 1, completed.stdout)
+        self.assertTrue((skill / "SKILL.md").is_file())
+        self.assertEqual(self.backups(), [])
+
+    def test_searcher_link_into_another_clone_is_moved(self) -> None:
+        # A v2 symlink install from a different, still-present clone keeps the removed agent listed.
+        other = self.home / "old-clone" / "agents"
+        other.mkdir(parents=True)
+        (other / "st-searcher.md").write_text(V2_SEARCHER, encoding="utf-8")
+        link = self.claude / "agents" / "st-searcher.md"
+        link.symlink_to(other / "st-searcher.md")
+
+        completed = self.run_script(INSTALL, "--migrate-legacy")
+
+        self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
+        self.assertFalse(os.path.lexists(link))
+        [backup] = self.backups()
+        self.assertTrue((backup / "agents" / "st-searcher.md").is_symlink())
+        self.assertTrue((other / "st-searcher.md").is_file())
+
     def test_v2_symlink_install_upgrades_in_place(self) -> None:
         # The v2 installer symlinked into the clone; after a pull the searcher link dangles.
         (self.claude / "skills" / "smartthink").symlink_to(REPO_ROOT / "skills" / "smartthink")

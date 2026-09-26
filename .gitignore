@@ -4,3 +4,6 @@
 
 # Task-runner state (fablize)
 .fablize/
+
+# Python bytecode caches
+__pycache__/
