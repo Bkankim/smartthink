@@ -64,7 +64,7 @@ test -n "$ST_VAULT" && test -d "$ST_VAULT" && rm -rf "$ST_VAULT"
 test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 ```
 
-## 3. 게이트 T1~T13
+## 3. 게이트 T1~T14
 
 ### T1. `/st init` 신규 프로필
 
@@ -239,6 +239,25 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
   - 생성 팩은 T2의 6개 절 제목과 manifest의 11개 필드를 지키고, 1절 브리핑을 출력한 뒤 본 작업에 착수하지 않는다.
   - Codex가 호출 또는 스킬 로딩 자체를 지원하지 않으면 `BLOCKED`로 판정하고, 기능 FAIL로 오판하지 않는다.
 - **증거**: 실행 시 `T13-transcript.md`, `T13-manifest.json`, `T13-pack.md`를 남긴다. 실행 불가 시 `T13-blocked.md`에 시도한 호출, 오류 원문, 필요한 Codex 통합 조건을 남긴다.
+
+### T14. 빈 `SMARTTHINK_VAULT`는 폴백하지 않는다
+
+- **목적**: 명시적으로 지정된 vault가 비어 있어도 그대로 쓰고, 기본 vault(`~/.claude/smartthink-vault`)를 건드리지 않는지 확인한다(이슈 #10 회귀).
+- **사전 조건**: `scripts/resolve-vault.py`가 있다. 빈 임시 디렉터리 하나와 비교용 마커 파일을 만든다. 기본 vault를 오염시킬 수 있는 실험이므로 가능하면 격리된 `HOME`에서 실행하고, 실제 `HOME`에서 돌릴 때는 사전에 기본 vault를 백업한다.
+- **입력**:
+  ```bash
+  export ST_EMPTY="$(mktemp -d)"; touch "$TMPDIR/st14-marker"
+  python3 scripts/resolve-vault.py            # 단위 확인: source가 env여야 한다
+  SMARTTHINK_VAULT="$ST_EMPTY" claude --plugin-dir . -p '/smartthink:smartthink --nosearch 지역 도서관 좌석 안내를 개선해줘'
+  find ~/.claude/smartthink-vault -newer "$TMPDIR/st14-marker"
+  ```
+  중첩 Claude Code 세션 안에서는 자식 프로세스가 `CLAUDE_CODE_OAUTH_TOKEN`만 읽는다(T12 참고). 게이트 자동 진행 회귀(#9)가 남아 있으면 입력 끝에 비대화식 진행 지시 1줄을 붙이고 그 사실을 기록한다.
+- **통과 기준**:
+  - resolver 단위 확인의 출력이 `{"path": "$ST_EMPTY", "source": "env"}`다.
+  - 헤드리스 실행이 팩을 만든다면 `$ST_EMPTY/packs/` 아래에 만든다.
+  - 마지막 `find` 출력이 비어 있다. 기본 vault에 새 파일이나 수정이 하나도 없다.
+- **증거**: `T14-output.txt`에 resolver 출력, 헤드리스 표준 출력, `find` 결과를 남긴다. 실행 불가 시 `T14-blocked.md`에 시도한 명령, 오류 원문, 필요한 조건을 남긴다.
+- **단위 대체 검증**: 헤드리스 실측이 막혀도 `tests/test_resolve_vault.py`와 `tests/test_migrate_target.py`가 같은 규칙(빈 env vault 사용, 기본 vault 폴백 없음)을 매번 검증한다.
 
 ## 4. 실측 기록
 
