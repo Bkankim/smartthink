@@ -21,6 +21,9 @@ V2_THINKER = "---\nname: st-thinker\neffort: max\n---\n# SmartThink 분석 엔�
 V2_SEARCHER = "---\nname: st-searcher\n---\n# SmartThink 검색 정찰\n"
 V2_ALIAS = 'Alias for /smartthink. Invoke Skill tool: `Skill("smartthink", "$ARGUMENTS")`'
 
+# The runner's own vault, config and XDG locations must never leak into a case.
+CONTROLLED = ("SMARTTHINK_VAULT", "CLAUDE_CONFIG_DIR", "XDG_DATA_HOME", "XDG_CONFIG_HOME")
+
 
 class InstallerTestCase(unittest.TestCase):
     def setUp(self) -> None:
@@ -35,7 +38,7 @@ class InstallerTestCase(unittest.TestCase):
         self._tmp.cleanup()
 
     def run_script(self, script: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        env = {key: value for key, value in os.environ.items() if key != "SMARTTHINK_VAULT"}
+        env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
         env["HOME"] = str(self.home)
         return subprocess.run(
             ["bash", str(script), *args], env=env, capture_output=True, text=True, check=False
@@ -65,7 +68,7 @@ class InstallerTestCase(unittest.TestCase):
         return old
 
     def detect(self) -> str:
-        env = {key: value for key, value in os.environ.items() if key != "SMARTTHINK_VAULT"}
+        env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
         env["HOME"] = str(self.home)
         completed = subprocess.run(
             ["python3", str(LEGACY), "detect"], env=env, capture_output=True, text=True, check=True
@@ -197,7 +200,7 @@ class InstallTest(InstallerTestCase):
     def test_unwritable_vault_stops_before_any_link(self) -> None:
         blocker = self.home / "not-a-dir"
         blocker.write_text("file, not a directory\n", encoding="utf-8")
-        env = {key: value for key, value in os.environ.items()}
+        env = {key: value for key, value in os.environ.items() if key not in CONTROLLED}
         env["HOME"] = str(self.home)
         env["SMARTTHINK_VAULT"] = str(blocker / "vault")
 
@@ -245,14 +248,14 @@ class UninstallTest(InstallerTestCase):
         self.assertFalse(os.path.lexists(self.claude / "commands" / "st.md"))
 
     def test_stale_pointer_is_mentioned(self) -> None:
-        vault_dir = self.claude / "smartthink-vault"
-        vault_dir.mkdir()
-        (vault_dir / "vault-pointer").write_text(str(self.home / "notes") + "\n", encoding="utf-8")
+        pointer = self.home / ".config" / "smartthink" / "vault-pointer"
+        pointer.parent.mkdir(parents=True)
+        pointer.write_text(str(self.home / "notes") + "\n", encoding="utf-8")
 
         completed = self.run_script(UNINSTALL)
 
         self.assertEqual(completed.returncode, 0, completed.stdout + completed.stderr)
-        self.assertIn("vault-pointer", completed.stdout)
+        self.assertIn(str(pointer), completed.stdout)
 
     def test_uninstall_removes_links_without_python(self) -> None:
         (self.claude / "skills" / "smartthink").symlink_to(REPO_ROOT / "skills" / "smartthink")

@@ -31,11 +31,13 @@
 ## `{VAULT}` 해석 규칙
 
 정본은 `scripts/resolve-vault.py`다. 스킬은 그 출력(`path`)만 쓴다. 요약하면
-`$SMARTTHINK_VAULT`(설정돼 있으면 비어 있어도 그대로, 폴백 없음) > `~/.claude/smartthink-vault/vault-pointer`
-(`st init`이 기본값이 아닌 경로를 확정하면 기록) > 기본값 `~/.claude/smartthink-vault` 순이다.
+`$SMARTTHINK_VAULT`(설정돼 있으면 비어 있어도 그대로, 폴백 없음) > `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`
+(`st init`이 기본값이 아닌 경로를 확정하면 기록) > 기본값 `${XDG_DATA_HOME:-~/.local/share}/smartthink` 순이다.
+기본값이 `~/.claude` 밖인 것은 Claude Code가 그 아래 쓰기를 허용 규칙과 무관하게 묻기 때문이다.
 `profile.md`의 vault 경로 필드는 표시용이며 해석에 쓰이지 않는다.
 
-기존에 쓰던 vault(Obsidian 등)가 있으면 그 안의 `smartthink/` 하위 디렉터리를 쓴다(D29).
+`st init`은 `resolve-vault.py --candidates`로 기존 노트 보관소(Obsidian 등) 후보를 찾아 보여 주고
+사용자가 고르게 한다(자동 선택 없음). 보관소를 고르면 그 안의 `smartthink/` 하위 디렉터리를 쓴다(D29).
 이때 **기존 vault를 훼손하지 않는다.** 기존 파일·디렉터리 구조는 그대로 두고 `profile.md`와
 `packs/`만 추가한다. 이름이 겹치는 파일을 덮어쓰지 않으며, 겹치면 사용자에게 묻는다.
 
@@ -61,7 +63,7 @@ v2의 진화 상태는 YAML 헤더 없는 산문 형식이다. 읽기는 그대�
 백그라운드 에이전트가 vault에 Write할 때 권한 프롬프트가 부모 세션에 뜰 수 있다. 그래서
 `st init`이 `resolve-vault.py --permission-rule`의 `permission_rule`(vault가 홈 아래면 `Edit(~/...)`,
 아니면 `Edit(//<절대경로>/**)`)을 `settings_path`(`${CLAUDE_CONFIG_DIR:-~/.claude}/settings.json`)에
-추가할지 **묻는다**. vault가 `~/.claude` 아래면(기본 vault 포함) Claude Code가 민감 경로로 보고 허용
+추가할지 **묻는다**. vault가 `~/.claude` 아래면 Claude Code가 민감 경로로 보고 허용
 규칙과 무관하게 묻기 때문에(`permission_rule_effective: false`) 규칙을 제안하지 않고 vault 이동을 안내한다.
 **승인했을 때만 기록한다**(D31). 거절해도 무장은 동작하며, 매번 권한 프롬프트가 뜰 뿐이다.
 

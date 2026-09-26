@@ -1,4 +1,4 @@
-# Runtime evolution state lives OUTSIDE the repo (default: ~/.claude/smartthink-vault/,
+# Runtime evolution state lives OUTSIDE the repo (default: ${XDG_DATA_HOME:-~/.local/share}/smartthink/,
 # override with $SMARTTHINK_VAULT). skill/.data/evolution-state.md is only the empty
 # template that install.sh seeds into the vault - keep it blank.
 
