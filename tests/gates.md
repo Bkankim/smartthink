@@ -41,6 +41,8 @@ python3 scripts/build-index.py --check
 - 구조 검사와 인덱스 검사는 종료 코드 0이어야 한다. 둘 중 하나라도 실패하면 T1부터 실행하지 말고 실패 출력을 별도 보관한다.
 - `tests/evidence/`가 존재하고 쓰기 가능한지 확인한다. 이 준비 단계에서 증거 파일을 미리 만들 필요는 없다.
 
+vault 규약(#20): 우선순위는 `SMARTTHINK_VAULT` > 포인터 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer` > 기본값 `${XDG_DATA_HOME:-~/.local/share}/smartthink`이다. 실제 홈의 이 두 경로는 게이트 실행 중 만들거나 쓰지 않는다. 기본값·포인터·후보 탐지 자체를 보는 게이트(T15)는 가짜 `HOME`에서 `XDG_DATA_HOME`·`XDG_CONFIG_HOME`을 지운 채 연다.
+
 실제 vault를 오염시키지 않기 위해 테스트마다 임시 vault를 권장한다. 아래처럼 현재 셸에 테스트 vault를 지정하고, Claude Code도 같은 셸에서 시작한다.
 
 ```bash
@@ -82,7 +84,7 @@ test -n "$ST_VAULT_V2" && test -d "$ST_VAULT_V2" && rm -rf "$ST_VAULT_V2"
 test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세션을 썼을 때
 ```
 
-## 3. 게이트 T1~T14
+## 3. 게이트 T1~T15
 
 ### T1. `/st init` 신규 프로필
 
@@ -219,7 +221,7 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
   - 첫 무장 중 백그라운드 Write 권한 프롬프트가 뜨는지 또는 뜨지 않는지가 관찰 결과로 명시된다. 어느 결과도 단독으로 FAIL은 아니다.
   - 승인 뒤에는 기존 JSON을 보존한 머지로 `permissions.allow`에 정확히 현재 vault를 가리키는 `Edit(<VAULT>/**)` 항목 하나만 추가하거나, 이미 있으면 중복 추가하지 않는다. Claude Code는 `/`로 시작하는 규칙 경로를 설정 파일 기준 상대경로로 해석하므로, 절대경로 vault를 가리키려면 `Edit(//<절대경로>/**)` 또는 `Edit(~/<홈 기준 경로>/**)` 형식이어야 한다. 단일 `/`로 시작하는 `Edit(/<절대경로>/**)`가 설치되면 이 기준은 FAIL이다(결함 추적: #14).
   - 설치 대상은 현재 세션의 사용자 설정 파일이다(`CLAUDE_CONFIG_DIR`가 있으면 그 안의 `settings.json`). 규칙 문자열과 대상 파일은 `resolve-vault.py --permission-rule`의 `permission_rule`·`settings_path`와 같아야 한다.
-  - vault가 `$HOME/.claude` 아래(기본 vault 포함)면 Claude Code가 그 아래 쓰기를 민감 파일로 보고 허용 규칙과 무관하게 묻는다. 이때 resolver는 `permission_rule_effective: false`를 내고, init은 규칙을 제안하지 않고 이유와 대안(vault 이동)을 안내해야 통과다. 이 경우 무장 중 Write 프롬프트는 FAIL이 아니라 알려진 제약으로 기록한다(#14 프로브).
+  - vault가 `$HOME/.claude` 아래이거나 경로에 `.claude`·`.git`·`.vscode`·`.idea` 폴더가 있으면 Claude Code가 그 아래 쓰기를 민감 파일로 보고 허용 규칙과 무관하게 묻는다(#20 이후 기본 vault `${XDG_DATA_HOME:-~/.local/share}/smartthink`는 해당 없음). 이때 resolver는 `permission_rule_effective: false`와 `permission_rule_reason`(`home-claude`·`protected-folder`)을 내고, init은 규칙을 제안하지 않고 이유와 대안(vault 이동)을 안내해야 통과다. 이 경우 무장 중 Write 프롬프트는 FAIL이 아니라 알려진 제약으로 기록한다(#14 프로브).
   - 재시도 결과와 프롬프트 발생 여부를 첫 시도와 비교해 기록한다. 규칙 설치 뒤 새 세션에서도 vault Write 프롬프트가 뜨면 규칙이 vault와 매칭되지 않는 것이다.
   - init은 Edit 규칙과 함께 `Bash(python3 <assemble-pack.py 절대경로> *)` 1개를 따로 묻고(위험 고지 포함) 승인한 규칙만 보존 머지로 추가한다(#21). 두 규칙 설치 뒤 새 세션 무장에서 armorer의 vault 쓰기(pack.md Write, `assemble-pack.py` Bash, manifest.json Write)는 프롬프트 0회여야 한다. armorer가 `mkdir`·heredoc·셸 리다이렉션·확인용 Bash를 쓰면 FAIL이다. 메인 세션의 resolver·읽기 확인 Bash나 리서치 WebFetch 프롬프트는 종류를 따로 기록하고 이 기준과 구분한다.
 - **증거**: `T9-settings.diff`, `T9-transcript.md`, `T9-prompt-observation.md`를 남긴다(재실측이면 접두어를 `T9-<회차>-`로 바꾼다). diff에는 `permissions.allow` 관련 전후만 남기고 무관한 설정은 `[REDACTED]`로 처리한다.
@@ -256,7 +258,7 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 - **목적**: 비대화식 실행에서 게이트가 자동 진행되고 120K 상한 및 절삭 기록이 적용되는지 확인한다. 두 호출 경로(`/st` 별칭과 `/smartthink:smartthink` 직접 호출)를 모두 본다.
 - **사전 조건**: `claude -p` 사용 가능, 호출 경로마다 새 임시 vault, 리포지터리 루트를 플러그인 디렉터리로 전달할 수 있다.
   - Claude Code 세션 안에서 중첩 실행하면 자식 프로세스는 로그인 정보 대신 `CLAUDE_CODE_OAUTH_TOKEN`만 읽는다. 이 변수를 자식 env에만 넣는다(없으면 "Not logged in", exit 1). 토큰 값은 어떤 증거에도 남기지 않는다.
-  - 사용자 레벨 정의와 CLAUDE.md·훅을 배제하려고 격리 `CLAUDE_CONFIG_DIR`에서 돌릴 때는 그 디렉터리의 `settings.json`에 allow 규칙을 넣는다. `-p` 자식은 승인 프롬프트에 답할 수 없어 규칙이 없으면 Bash·쓰기가 전부 거부된다(T14). 예: `"allow": ["Bash", "Read", "Glob", "Grep", "Edit(//<임시 vault 절대경로>/**)", "WebSearch", "WebFetch", "Agent", "Skill"]`, `"deny": ["Read(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]`. 절대경로 규칙은 `//`로 시작한다(`/`는 설정 파일 기준 상대경로). 쓰기 규칙은 `Edit(...)`가 모든 파일 편집 도구를 덮는다. 넣은 settings.json 원문을 증거에 남긴다.
+  - 사용자 레벨 정의와 CLAUDE.md·훅을 배제하려고 격리 `CLAUDE_CONFIG_DIR`에서 돌릴 때는 그 디렉터리의 `settings.json`에 allow 규칙을 넣는다. `-p` 자식은 승인 프롬프트에 답할 수 없어 규칙이 없으면 Bash·쓰기가 전부 거부된다(T14). 예: `"allow": ["Bash", "Read", "Glob", "Grep", "Edit(//<임시 vault 절대경로>/**)", "WebSearch", "WebFetch", "Agent", "Skill"]`, `"deny": ["Read(~/.local/share/smartthink/**)", "Edit(~/.local/share/smartthink/**)", "Read(~/.claude/smartthink-vault/**)", "Edit(~/.claude/smartthink-vault/**)"]`. 뒤의 두 규칙은 #20 이전 옛 위치(메인테이너 머신 잔존, 이전 전까지)를 막는 보호 규칙이다. 절대경로 규칙은 `//`로 시작한다(`/`는 설정 파일 기준 상대경로). 쓰기 규칙은 `Edit(...)`가 모든 파일 편집 도구를 덮는다. 넣은 settings.json 원문을 증거에 남긴다.
 - **입력**: 우회 문구 없이 원문 그대로 두 경로를 각각 실행한다.
   - `/st` 경로: `SMARTTHINK_VAULT="$ST_VAULT" claude --plugin-dir . -p '/st --budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘'`
   - 직접 호출 경로: `SMARTTHINK_VAULT="$ST_VAULT" claude --plugin-dir . -p '/smartthink:smartthink --budget 200000 지역 도서관 예약 시스템의 장기 개선 전략을 검토해줘'`
@@ -295,14 +297,14 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 
 ### T14. 빈 `SMARTTHINK_VAULT`는 폴백하지 않는다
 
-- **목적**: 명시적으로 지정된 vault가 비어 있어도 그대로 쓰고, 기본 vault(`~/.claude/smartthink-vault`)를 건드리지 않는지 확인한다(이슈 #10 회귀).
+- **목적**: 명시적으로 지정된 vault가 비어 있어도 그대로 쓰고, 기본 vault(`${XDG_DATA_HOME:-~/.local/share}/smartthink`)를 건드리지 않는지 확인한다(이슈 #10 회귀).
 - **사전 조건**: `scripts/resolve-vault.py`가 있다. 빈 임시 디렉터리 하나와 비교용 마커 파일을 만든다. 기본 vault를 오염시킬 수 있는 실험이므로 가능하면 격리된 `HOME`에서 실행하고, 실제 `HOME`에서 돌릴 때는 사전에 기본 vault를 백업한다.
 - **입력**:
   ```bash
   export ST_EMPTY="$(mktemp -d)"; touch "$TMPDIR/st14-marker"
   SMARTTHINK_VAULT="$ST_EMPTY" python3 scripts/resolve-vault.py   # 단위 확인: source가 env여야 한다
   SMARTTHINK_VAULT="$ST_EMPTY" claude --plugin-dir . -p '/smartthink:smartthink --nosearch 지역 도서관 좌석 안내를 개선해줘'
-  find ~/.claude/smartthink-vault -newer "$TMPDIR/st14-marker"
+  find "${XDG_DATA_HOME:-$HOME/.local/share}/smartthink" -newer "$TMPDIR/st14-marker" 2>/dev/null
   ```
   중첩 Claude Code 세션 안에서는 자식 프로세스가 `CLAUDE_CODE_OAUTH_TOKEN`만 읽는다(T12 참고). 게이트 자동 진행 회귀(#9)가 남아 있으면 입력 끝에 비대화식 진행 지시 1줄을 붙이고 그 사실을 기록한다.
 - **통과 기준**:
@@ -311,6 +313,28 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
   - 마지막 `find` 출력이 비어 있다. 기본 vault에 새 파일이나 수정이 하나도 없다.
 - **증거**: `T14-output.txt`에 resolver 출력, 헤드리스 표준 출력, `find` 결과를 남긴다. 실행 불가 시 `T14-blocked.md`에 시도한 명령, 오류 원문, 필요한 조건을 남긴다.
 - **단위 대체 검증**: 헤드리스 실측이 막혀도 `tests/test_resolve_vault.py`와 `tests/test_migrate_target.py`가 같은 규칙(빈 env vault 사용, 기본 vault 폴백 없음)을 매번 검증한다.
+
+### T15. init vault 후보 제안
+
+- **목적**: `st init` ⑤가 `resolve-vault.py --candidates`의 결정적 탐지 결과를 보여 주고 자동 선택 없이 사용자가 고르게 하는지, 고른 뒤 포인터·권한 규칙이 새 규약 위치에 기록되고 새 세션 무장에서 vault Write/Edit 도구 프롬프트가 사라지는지 확인한다(이슈 #20).
+- **사전 조건**: 2절의 격리 설정 세션 + 가짜 `HOME`. 실제 홈의 `~/.config/smartthink`·`~/.local/share/smartthink`를 만들거나 쓰지 않는다.
+  - `XDG_DATA_HOME`·`XDG_CONFIG_HOME`·`SMARTTHINK_VAULT`를 지운다(`env -u`). 포인터를 보려면 env vault가 없어야 한다. 대신 resolver를 먼저 실행해 `path`가 가짜 홈 아래인지 확인한다.
+  - 격리 `settings.json`은 `{"permissions":{"defaultMode":"default","deny":[...]}}`로 둔다. deny에는 실제 홈 절대경로(`//<실제 홈>/...`)로 새 기본값·포인터 디렉터리와 옛 위치(메인테이너 머신 잔존)를 넣는다. 가짜 `HOME`에서는 `~`가 가짜 홈을 가리키므로 `~/` 규칙으로는 실제 홈을 못 막는다.
+  - 가짜 홈 픽스처(실제 사례 재현): Obsidian 등록 목록(`~/Library/Application Support/obsidian/obsidian.json`)이 파일 1개짜리 안 쓰는 기본 vault와 리포 30개를 담은 작업 폴더 루트를 가리키고, 진짜 보관소는 이름 신호만 있는 git 리포다.
+- **입력**:
+  ```bash
+  env -u SMARTTHINK_VAULT -u XDG_DATA_HOME -u XDG_CONFIG_HOME HOME="$FAKE_HOME" CLAUDE_CONFIG_DIR="$ST_CFG" \
+    CLAUDE_CODE_OAUTH_TOKEN="$ANTHROPIC_OAUTH_TOKEN" claude --plugin-dir . --model opus
+  ```
+  `/smartthink:smartthink init` → ⑤에서 진짜 보관소 후보를 고르고 `.gitignore` 질문과 권한 규칙 설치를 승인한다. 세션을 닫고 같은 명령으로 새 세션을 열어 `/smartthink:smartthink --nosearch 지역 도서관 좌석 예약 안내를 개선해줘`로 무장한다.
+- **통과 기준**:
+  - ⑤에 후보마다 신호·마지막 수정일·대략 파일 수·git 여부·경고가 붙은 목록과 "새로 만들기(기본값)"·"직접 입력"이 뜨고, 어느 후보도 미리 골라 두지 않는다(Enter 수락 기본값·추천 표시 없음). 안 쓰는 기본 vault와 작업 폴더 루트에 경고가 붙는다.
+  - 고른 보관소의 `<보관소>/smartthink/`가 vault가 되고 기존 파일은 그대로다. git 리포면 `packs/` 제외 여부를 묻는다.
+  - 포인터가 가짜 홈의 `~/.config/smartthink/vault-pointer`에 기록되고 resolver가 `source: pointer`로 같은 경로를 낸다.
+  - `permission_rule_effective: true`로 규칙을 제안하고 승인 시 격리 settings.json에 보존 머지한다.
+  - 새 세션 무장에서 vault에 대한 Write/Edit 도구 프롬프트가 0회다. Bash 프롬프트는 기록만 한다(#21 소관).
+- **증거**: `T15-prompt-observation.md`(환경·픽스처·settings 전후·포인터·프롬프트 순서 기록·판정), `T15-transcript.md`(⑤ 화면 원문, 세션별 도구 호출 목록과 Base directory, 무장 마지막 화면), `T15-candidates.json`(가짜 홈 `--candidates` 출력).
+- **단위 대체 검증**: `tests/test_resolve_vault.py`의 `CandidatesTest`가 같은 실제 사례 픽스처와 제외 규칙·경고·자동 선택 필드 부재를 매번 검증한다.
 
 ## 4. 실측 기록
 
@@ -354,3 +378,5 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 | T13 | BLOCKED | 2026-09-26 | T13-rerun-blocked.md, T13-rerun-transcript.md, T13-rerun-pack.md, T13-rerun-manifest.json | 재실측(#8, 브랜치 docs-8-gates-rerun = main 65272b5, codex-cli 0.155.1, `~/.codex/skills/smartthink` 등록(메인 체크아웃을 가리킴, 이 브랜치와 같은 커밋), 리포 밖 cwd). 스킬 진입은 `$smartthink`로 성공(`/smartthink`는 Unrecognized command), 게이트·팩(6절·11필드·`harness: "codex"`·H 5/5)·브리핑 후 턴 종료 충족. 그러나 이 Codex에는 `spawn_agent`가 있어 armorer 경로로 진행했고 인라인 안내문은 나오지 않음. `--disable multi_agent*`로도 도구가 남아 인라인 경로 관찰 불가. 첫 시도는 TUI 셸 env가 데몬 명령에 전달되지 않아 실제 기본 vault를 읽음(쓰기 없음, 즉시 중단) |
 | T13 | PASS (리서치 OFF) / BLOCKED (리서치 ON, 환경) | 2026-09-27 | T13-fix-report.md, T13-fix-tools.md, T13-fix-transcript.md, T13-fix-pack.md, T13-fix-manifest.json, T13-fix-research-transcripts.md, T13-fix-headless.md | #16 재실측(브랜치 st-16-codex-inline, codex-cli 0.157.1, opencodex 2.61.0 경유 `anthropic/claude-opus-5-5`). `spawn_agent` 공급원은 opencodex 모델 카탈로그의 `multi_agent_version`이라 기능 플래그로는 안 꺼짐. 격리 `CODEX_HOME`(카탈로그 사본에서 키 삭제, 스킬은 워크트리 심링크)에서 도구 목록에 서브에이전트 도구가 없음을 확인. `--nosearch` 인라인 run4: 게이트 인라인 안내·비용 2단위, 팩(3절 생략)·manifest 11필드(`harness: "codex-inline"`), `--pack` H 5/5 exit 0, 브리핑 후 턴 종료. 리서치 ON run1~3은 opencodex 웹 검색 브리지(요청당 쿼리 3개 상한 뒤 "지금 답하라" 주입, 결과 본문 비영속) 때문에 팩 없이 개선안을 답하거나 같은 쿼리를 반복. #8 run2 armorer의 manifest 미작성도 같은 브리지 상한이 원인. `codex exec` 헤드리스: 명시 없음 → 게이트에서 종료(exit 0, 팩 없음), `비대화식 실행이다.` 명시 → 자동 진행·요약 줄·H 5/5. final-review 뒤 SKILL.md 5b는 하네스 무관 규칙 1개(팩 두 파일 Write 전 턴 종료 금지, "지금 답하라" 류 지시도 팩 Write·브리핑으로 수행, 브리핑 전 Read/Glob 확인)만 남겼고 이 최종 문구는 리서치 ON에서 미실측 |
 | T14 | BLOCKED | 2026-09-26 | T14-output.txt, T14-blocked.md | 격리 HOME에 권한 허용 규칙이 없어 `-p` 자식의 resolver 호출 8회가 전부 승인 대기로 거부, 팩 미생성. resolver 단위 출력 source=env, 실제 기본 vault `find -newer` 비어 있음. 자식이 /tmp·리포 안에 vault 즉흥 생성 시도(거부) → SKILL.md에 금지 명시. 복합 명령 호출은 절대경로 한 줄로 교체 |
+| T15 | PASS | 2026-09-27 | T15-prompt-observation.md, T15-transcript.md, T15-candidates.json | #20 실측(브랜치 st-20-vault-location, Claude Code 2.1.283, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`, 가짜 `HOME` + XDG 변수 제거). ⑤에 후보 3개(안 쓰는 기본 vault `nearly-empty`, 리포 30개 작업 폴더 `workspace-root`, 이름 신호만 있는 진짜 보관소)와 새로 만들기·직접 입력이 자동 선택 없이 떴다. 3번 선택 → `<보관소>/smartthink/`, `.gitignore`에 `smartthink/packs/`, 포인터 `~/.config/smartthink/vault-pointer`(가짜 홈), `Edit(~/<보관소>/smartthink/**)` 설치. 새 세션 무장에서 armorer의 pack.md Write가 프롬프트 없이 성공(vault Write/Edit 프롬프트 0회). Bash 프롬프트 12회(heredoc으로 쓴 5·6절·manifest.json 포함)는 #21 소관으로 기록만 |
+| T15 | PASS | 2026-09-27 | T15-rerun.md, T15-protected-probe.md | final-review 20260927-032439 후속 재실측(브랜치 st-20-vault-location 1b01df4, #21 병합 포함, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`, 가짜 `HOME`, 읽기 도구 사전 허용 원문 기록). init이 ⑤ 확정 전에 기본 위치를 만들지 않았고(빈 폴더 잔존 해소), 후보 3개 자동 선택 없이 제시 → 3번 → 포인터·`.gitignore` → `Edit` + `assemble-pack` Bash 규칙 설치. 새 세션 무장 2회(`--digest`, 원문 1모듈)에서 pack.md·manifest.json Write와 assemble-pack Bash 모두 무프롬프트(vault 쓰기 관련 프롬프트 0회). 남은 7회는 cwd 밖을 읽는 복합 읽기 Bash |

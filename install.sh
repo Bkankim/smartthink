@@ -108,19 +108,31 @@ for f in "${COMMAND_FILES[@]}"; do
   fi
 done
 
-# Vault, prepared before any link is created so an unwritable vault stops the install
-# cleanly. It lives OUTSIDE the repo so your profile and insights never get committed.
-# scripts/resolve-vault.py owns the path rules and the seeding; this script only reports.
-# profile.md is intentionally NOT seeded: its absence is the signal that tells SmartThink to
-# suggest /st init, which is what actually fills the profile in.
-if ! VAULT_JSON="$(python3 "$RESOLVER" --ensure)"; then
-  echo "ERROR: could not prepare the vault (see the message above)."
+# Vault, checked before any link is created so an unwritable vault stops the install cleanly.
+# It lives OUTSIDE the repo so your profile and insights never get committed. The folder itself is
+# NOT created here: /st init step 5 picks it (maybe an existing note store), and seeding the default
+# first would leave an unused folder behind. The first run creates the resolved vault instead.
+# scripts/resolve-vault.py owns the path rules; this script only checks and reports.
+if ! VAULT_JSON="$(python3 "$RESOLVER")"; then
+  echo "ERROR: could not resolve the vault (see the message above)."
   exit 1
 fi
 VAULT="$(printf '%s' "$VAULT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["path"])')"
 VAULT_SOURCE="$(printf '%s' "$VAULT_JSON" | python3 -c 'import json, sys; print(json.load(sys.stdin)["source"])')"
+# The vault, or the nearest part of its path that already exists, must be a writable directory.
+VAULT_BASE="$(python3 -c 'import os, sys; p = sys.argv[1]
+while not os.path.lexists(p): p = os.path.dirname(p)
+print(p)' "$VAULT")"
+if [ ! -d "$VAULT_BASE" ] || [ ! -w "$VAULT_BASE" ]; then
+  echo "ERROR: the vault $VAULT cannot be created or written ($VAULT_BASE is not a writable directory)."
+  exit 1
+fi
 echo "Vault          : $VAULT (from $VAULT_SOURCE)"
-echo "Packs dir      : $VAULT/packs"
+if [ -d "$VAULT" ]; then
+  echo "Packs dir      : $VAULT/packs"
+else
+  echo "Packs dir      : $VAULT/packs (created on first use; /st init can pick another vault)"
+fi
 
 if [ -n "$LEFTOVERS" ]; then
   echo "Moving leftovers of an earlier install to a backup:"
