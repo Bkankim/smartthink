@@ -343,10 +343,19 @@ Agent 도구가 있으면 이 경로다.
 Agent(
   subagent_type: "smartthink:st-armorer",
   description: "SmartThink 무장 팩 생성",
-  run_in_background: false,     // 동기. 팩이 완성돼야 6단계로 갈 수 있다
+  run_in_background: false,     // 동기 요청. 팩이 완성돼야 6단계로 갈 수 있다
   prompt: <아래 Input 블록>
 )
 ```
+
+### 백그라운드 스폰 대기 규칙
+
+Agent 도구에 `run_in_background` 파라미터가 없는 하네스가 있다. Claude Code 2.1.283이 그렇다. 이런 하네스에서는 스킬이 동기 실행을 강제할 수 없다. `false`를 요청해도 인자가 버려지고, 정식 armorer든 `general-purpose` 폴백이든 `Async agent launched ... working in the background` 결과와 함께 백그라운드로 뜬다(근거: `tests/evidence/T8-fix-probe.md`). **동기 요구의 실체는 "팩이 완성돼야 6단계"이므로, 백그라운드로 떴으면 완료 알림을 기다리는 것으로 동기를 대신한다.**
+
+1. 스폰 결과가 백그라운드면 **완료 알림이 오기 전에는 6단계를 시작하지 마라.** pack.md Read, 1절 브리핑 출력, 비용 줄 출력을 하지 않는다. 진행 중인 에이전트의 출력 파일도 Read하지 않는다.
+2. 대기 중 출력은 "무장 팩을 만드는 중이며 완료 알림 뒤 브리핑을 출력한다"는 사실 1줄까지만 허용한다. 팩 내용·모듈·결론을 추측해 쓰지 마라. 같은 작업을 메인이 병행하지도 마라(5b로 갈아타기 금지).
+3. 완료 알림이 오면 먼저 아래 [반환 규약](#반환-규약)의 확인 항목(팩 디렉터리 경로, 실제 포함 모듈, 리서치 수행 여부, 실제 추정 토큰)으로 반환을 확인하라. 반환 규약의 위반 조건(팩 파일 부재, 절 구조 불일치)에 걸리면 폴백 사슬의 다음 단계로 내려가고, 걸리지 않으면 6단계로 간다.
+4. 헤드리스(`claude -p`) 실행에는 **`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0`을 설정하라.** 이 env가 없으면 `-p`가 백그라운드 대기를 기본 상한(실측 약 600초)에서 끊어, armorer가 끝나기 전에 팩·헤드리스 요약 줄 없이 프로세스가 끝날 수 있다(이전 헤드리스 런 기록: 600초 상한에 잘려 팩 디렉터리만 남음). 설정하면 완료 알림 뒤 응답이 마지막 응답이 되므로 [헤드리스 동작](#헤드리스-동작)의 요약 줄은 그 응답에 넣는다.
 
 ### 에이전트 이름 해석 규칙
 
@@ -359,7 +368,7 @@ Agent(
 
 ### armorer에 넘길 Input 블록 (동적 변수만)
 
-정적 지시(역할·팩 명세·절차)는 `agents/st-armorer.md` 정의에 내장돼 있다. 프롬프트에는 아래만 치환 완료 상태로 전달하라.
+정적 지시(역할·팩 명세·절차)는 `agents/st-armorer.md` 정의에 내장돼 있다(정의가 없을 때의 동기화 사본은 `references/armorer-prompt.md`). 프롬프트에는 아래만 치환 완료 상태로 전달하라.
 
 ```
 ## Input
@@ -385,9 +394,11 @@ Agent(
 
 반환에서 확인할 것: 팩 디렉터리 경로, 실제 포함 모듈, 리서치 수행 여부, 실제 추정 토큰. 게이트에서 표시한 값과 크게 다르면 6단계 브리핑 말미에 차이를 1줄로 알려라.
 
+**위반 조건**: 반환된 팩 디렉터리에 `pack.md`나 `manifest.json`이 없거나(팩 파일 부재), `pack.md`의 절 제목이 [팩 명세](#팩-명세)의 6개 문자열과 다르면(절 구조 불일치) 반환 규약 위반이다. `무장 실패: <사유>` 반환도 팩 파일 부재로 본다. 위반이면 [이름 해석 규칙](#에이전트-이름-해석-규칙)대로 폴백 사슬의 다음 단계로 내려간다.
+
 ### 폴백
 
-1. `smartthink:st-armorer` 스폰 실패 → 위 이름 해석 규칙대로 bare `st-armorer`로 1회 재시도. **두 이름이 모두 실패**(정의 부재 포함)해야 폴백이다 → `subagent_type: "general-purpose"`로 스폰하고 **armorer 임무 전체를 프롬프트 본문에 브리핑하라**(팩 명세·절 제목·반환 규약 포함).
+1. `smartthink:st-armorer` 스폰 실패 → 위 이름 해석 규칙대로 bare `st-armorer`로 1회 재시도. **두 이름이 모두 실패**(정의 부재 포함)해야 폴백이다 → `{SKILL_DIR}/references/armorer-prompt.md`(폴백 SSOT)를 Read해 그 전문 끝에 위 Input 블록을 붙인 것을 prompt로 써서 `subagent_type: "general-purpose"`로 스폰하라. 전문을 요약하거나 다시 쓰지 마라. **git 이력(`git show`, `git log` 등)이나 다른 설치본에서 정의를 복구하지 마라** - git이 없는 설치(복사본·플러그인 캐시)에서도 동작해야 하고, 폴백 파일이 정의 본문의 동기화 사본이다. 백그라운드로 뜨면 위 대기 규칙이 그대로 적용된다.
 2. 그것도 실패 → **5b 인라인 경로로 강등**하고 사용자에게 1줄로 알려라.
 
 ---
@@ -588,7 +599,8 @@ digest 모드에서도 마커는 필수다. `sha256` 필드도 END 마커도 없
 |---|---|
 | Agent 도구 없음(Codex 등) | 인라인 경로. 게이트에 리서치 비용 표시 |
 | `smartthink:` 접두어 이름 not found | bare `st-armorer`/`st-thinker`로 1회 재시도(플러그인이 아닌 설치). 반환이 계약을 어기면 다른 정의로 보고 폴백 |
-| `smartthink:st-armorer` 정의 없음 | bare 재시도 실패 후 `general-purpose` + 본문 브리핑 폴백, 그것도 없으면 인라인 |
+| `smartthink:st-armorer` 정의 없음 | bare 재시도 실패 후 `general-purpose` + `armorer-prompt.md` 폴백(git 이력 복구 금지), 그것도 없으면 인라인 |
+| Agent에 `run_in_background` 없음(armorer가 백그라운드로 뜸) | 완료 알림까지 6단계 보류, 추측 출력 금지. 알림 뒤 반환 규약 확인 후 6단계([대기 규칙](#백그라운드-스폰-대기-규칙)) |
 | `smartthink:st-thinker` 정의 없음 | bare 재시도 실패 후 `--report`를 `general-purpose` + `thinker-prompt.md` 폴백 |
 | 검색 도구 없음/실패 | 팩 3절 생략, `manifest.research=false`, 브리핑에 명시 |
 | `insane-search` 없음 | WebFetch만. 차단 소스는 "차단"으로 표기하고 건너뜀 |
