@@ -1,0 +1,38 @@
+# T9-fix settings diff (#14). 임시 디렉터리 이름만 치환: <VAULT_DIR>, <ISOLATED_CONFIG_DIR>, <FAKE_HOME_DIR>, <FAKE_HOME2_DIR>. 규칙 앞 슬래시 수는 원문 그대로다.
+
+## 1) env vault(/var/folders 아래), 격리 CLAUDE_CONFIG_DIR: init 승인 전후 (settings.json.bak -> settings.json)
+--- /var/folders/[REDACTED]/T/<ISOLATED_CONFIG_DIR>/settings.json.bak	2026-09-27 01:00:58
++++ /var/folders/[REDACTED]/T/<ISOLATED_CONFIG_DIR>/settings.json	2026-09-27 01:02:12
+@@ -1,6 +1,9 @@
+ {
+   "permissions": {
+-    "defaultMode": "default"
++    "defaultMode": "default",
++    "allow": [
++      "Edit(//var/folders/[REDACTED]/T/<VAULT_DIR>/**)"
++    ]
+   },
+   "theme": "dark"
+ }
+
+## 2) 기본 vault, 가짜 HOME(CLAUDE_CONFIG_DIR 미설정): init 승인 전후
+--- /var/folders/[REDACTED]/T/<FAKE_HOME_DIR>/.claude/settings.json.bak	2026-09-27 01:22:39
++++ /var/folders/[REDACTED]/T/<FAKE_HOME_DIR>/.claude/settings.json	2026-09-27 01:22:39
+@@ -1 +1,8 @@
+-{"permissions":{"defaultMode":"default"}}
++{
++  "permissions": {
++    "defaultMode": "default",
++    "allow": [
++      "Edit(~/.claude/smartthink-vault/**)"
++    ]
++  }
++}
+
+## 3) 기본 vault, 가짜 HOME2, permission_rule_effective=false 분기(2번째 커밋) 적용 후 init: settings.json 무변경
+settings.json.bak count: 0
+{"permissions":{"defaultMode":"default"}}
+
+## 실제 사용자 설정 불변 확인 (테스트 시작 전 sha256 기록 후 비교)
+$ shasum -a 256 -c real-settings.sha
+<HOME>/.claude/settings.json: OK
