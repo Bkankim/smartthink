@@ -16,6 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 ARMORER = Path("agents") / "st-armorer.md"
 FALLBACK = Path("skills") / "smartthink" / "references" / "armorer-prompt.md"
 ASSEMBLER = Path("scripts") / "assemble-pack.py"
+SKILL = Path("skills") / "smartthink" / "SKILL.md"
+INLINE_STEP = "5. 그대로 6단계로 진행하라"
 CHECK_LINE = "D. wiring: st-armorer assembles section 5 with assemble-pack.py"
 MARKER_LINE = "D. wiring: section 5 module marker forms match the SSOT"
 
@@ -26,6 +28,14 @@ printf '<!-- MODULE-BEGIN: %s sha256=%s -->\\n' "$NAME" "$HASH" >> "$PACK"
 cat "$SRC" >> "$PACK"
 ```
 """
+
+# final-review #4: other shell writes that bypass the script, each on its own.
+OTHER_SHELL_WRITES = (
+    'mkdir -p "$PACK_DIR"',
+    "cat <<'EOF' > \"$PACK\"",
+    "printf '%s' \"$HEAD\" > \"$PACK\"",
+    'tee -a "$PACK" < "$SRC"',
+)
 
 
 class ArmorerAssemblyCheckTest(unittest.TestCase):
@@ -75,6 +85,34 @@ class ArmorerAssemblyCheckTest(unittest.TestCase):
                 line = self.line_for(result.stdout, CHECK_LINE)
                 self.assertTrue(line.startswith("FAIL"), line)
                 self.assertIn(str(target), result.stdout)
+
+    def test_other_shell_writes_into_the_pack_fail(self) -> None:
+        path = self.copy / ARMORER
+        original = path.read_text(encoding="utf-8")
+        for line in OTHER_SHELL_WRITES:
+            with self.subTest(line=line):
+                path.write_text(original + "\n```bash\n" + line + "\n```\n", encoding="utf-8")
+                try:
+                    result = self.run_checker()
+                finally:
+                    path.write_text(original, encoding="utf-8")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertTrue(self.line_for(result.stdout, CHECK_LINE).startswith("FAIL"))
+
+    def test_inline_path_in_skill_md_is_scanned_too(self) -> None:
+        # final-review #9: SKILL.md 5b carries the same assembly rule, so a redirection put back
+        # there must fail D. Its Write-only branch for harnesses without Bash stays allowed.
+        path = self.copy / SKILL
+        original = path.read_text(encoding="utf-8")
+        self.assertEqual(original.count(INLINE_STEP), 1)
+        tampered = original.replace(
+            INLINE_STEP, '   - `printf \'%s\' "$X" >> "{VAULT}/packs/p/pack.md"`로 5절을 붙인다\n' + INLINE_STEP
+        )
+        path.write_text(tampered, encoding="utf-8")
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertTrue(self.line_for(result.stdout, CHECK_LINE).startswith("FAIL"))
+        self.assertIn(str(SKILL), result.stdout)
 
     def test_assembler_marker_template_drift_fails(self) -> None:
         # Issue #19: the marker format of whatever writes section 5 must be held to the SSOT.

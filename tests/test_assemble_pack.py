@@ -185,6 +185,49 @@ class AssemblePackTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(oct(pack.stat().st_mode & 0o777), oct(0o644))
 
+    def test_repeated_module_name_is_refused(self) -> None:
+        # final-review #3: a repeated name used to copy the same module into section 5 twice.
+        pack = self.write_pack()
+        before = pack.read_bytes()
+        result = self.assemble(
+            "--pack-dir", str(self.pack_dir), "--modules", "core-engines.md", "core-engines.md"
+        )
+        self.assertNotEqual(result.returncode, 0, result.stdout)
+        self.assertIn("more than once", result.stderr)
+        self.assertEqual(pack.read_bytes(), before)
+
+    def test_rule_and_command_prefix_use_the_invoked_path_under_a_symlinked_ancestor(self) -> None:
+        # final-review #7: init and the armorer both type python3 {SCRIPTS_DIR}/assemble-pack.py
+        # with the same {SCRIPTS_DIR} string. If the rule resolves a symlinked ancestor
+        # (/tmp -> /private/tmp, a linked checkout) it no longer matches that string.
+        real = self.root / "real" / "scripts"
+        real.mkdir(parents=True)
+        (real / "assemble-pack.py").write_bytes(ASSEMBLER.read_bytes())
+        (self.root / "link").symlink_to(self.root / "real")
+        invoked = self.root / "link" / "scripts" / "assemble-pack.py"
+        result = subprocess.run(
+            [sys.executable, str(invoked), "--permission-rule"], capture_output=True, text=True, check=False
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["command_prefix"], f"python3 {invoked}")
+        self.assertEqual(payload["permission_rule"], f"Bash(python3 {invoked} *)")
+
+    def test_shell_metacharacters_in_the_script_path_make_the_rule_ineffective(self) -> None:
+        # final-review #8: the command is typed unquoted, so any character the shell treats
+        # specially changes the words or fails to parse, and the prefix rule cannot match.
+        for directory in ("with(paren)", "dollar$x", "semi;colon", "glob[x]", "star*", "quote'x", "amp&x"):
+            with self.subTest(directory=directory):
+                scripts = self.root / directory / "scripts"
+                scripts.mkdir(parents=True)
+                copy = scripts / "assemble-pack.py"
+                copy.write_bytes(ASSEMBLER.read_bytes())
+                result = subprocess.run(
+                    [sys.executable, str(copy), "--permission-rule"], capture_output=True, text=True, check=False
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIs(json.loads(result.stdout)["permission_rule_effective"], False)
+
 
 if __name__ == "__main__":
     unittest.main()

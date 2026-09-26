@@ -77,3 +77,46 @@
   E       AssertionError: '0o600' != '0o644'
   ```
 - green: `6 passed, 3 subtests passed`
+
+# final-review 20260927-030228 후속 (코디네이터 판정)
+
+## FR-3 중복 모듈 이름 거부 (패치 03을 되돌린 상태에서 테스트 먼저)
+- 테스트: `test_repeated_module_name_is_refused`
+- red:
+  ```
+  E       AssertionError: 0 == 0 : {"pack": ".../vault/packs/2026-09-27-fixture/pack.md", "modules": ["core-engines.md", "core-engines.md"], "bytes": 134527, "est_tokens_pack": 61149}
+  ```
+- green(패치 03 재적용): `7 passed, 3 subtests passed`
+
+## FR-4 `mkdir -p`·단일 `>`(heredoc 포함)·`tee`도 D절 FAIL (패치 04를 되돌린 상태에서 테스트 먼저)
+- 테스트: `tests/test_check_structure_armorer.py::test_other_shell_writes_into_the_pack_fail`(변조 사본 4형태)
+- red(4개 형태 모두 D절 PASS, exit 0):
+  ```
+  E               AssertionError: 0 != 1 : PASS A. layout: required paths exist
+  E               37 passed, 0 failed, 5 skipped
+  ```
+- green(패치 04 재적용): `4 passed, 6 subtests passed`
+
+## FR-7 규칙과 command_prefix가 호출된 `{SCRIPTS_DIR}` 경로(심링크 조상 미해석)를 쓴다
+- 테스트: `test_rule_and_command_prefix_use_the_invoked_path_under_a_symlinked_ancestor`(`link -> real` 심링크 조상 픽스처, 임시 디렉터리 자체도 macOS에서 `/var -> /private/var` 아래)
+- red:
+  ```
+  E       KeyError: 'command_prefix'
+  ```
+- green: `8 passed, 3 subtests passed`
+
+## FR-8 공백 외 셸 특수 문자가 있는 스크립트 경로도 effective=false
+- 테스트: `test_shell_metacharacters_in_the_script_path_make_the_rule_ineffective`(`(`, `$`, `;`, `[]`, `*`, `'`, `&`)
+- red:
+  ```
+  E               AssertionError: True is not False
+  ```
+- green: `9 passed, 10 subtests passed`
+
+## FR-9 D절 조립 검사가 SKILL.md 5b도 스캔(Bash 없는 하네스 분기는 허용)
+- 테스트: `test_inline_path_in_skill_md_is_scanned_too`(5b에 `printf ... >> ".../pack.md"` 줄을 넣은 변조 사본)
+- red:
+  ```
+  E       AssertionError: 0 != 1 : PASS A. layout: required paths exist
+  ```
+- green: `5 passed, 6 subtests passed`, 실제 리포 D절 evidence에 `skills/smartthink/SKILL.md:417 calls assemble-pack.py`

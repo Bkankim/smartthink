@@ -414,8 +414,9 @@ Agent 도구가 없거나 5a가 두 번 실패하면 이 경로다. **절차와 
 3. 아래 팩 명세대로 합성하라
 4. `{VAULT}/packs/<날짜>-<슬러그>/`에 `pack.md`와 `manifest.json`을 써라. 5절 원문은 5a와 같이 `assemble-pack.py`가 붙인다(armorer 정의 Step E와 같은 규칙):
    1. `pack.md`를 Write로 한 번 쓴다. 1~6절 전체를 쓰되 `## 5. 레퍼런스 원문` 제목 줄 아래 본문은 비워 둔다(digest 모드면 증류본과 DIGEST 마커를 여기서 5절 본문으로 쓰고 2는 건너뛴다)
-   2. Bash로 `python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir <팩 디렉터리> --modules <모듈 파일명...>`을 **한 줄로 한 번** 실행한다(따옴표·`cd`·`&&`·리다이렉션 없이). vault에 쓰는 Bash는 이 명령 하나뿐이다
+   2. Bash로 `python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir "<팩 디렉터리>" --modules <모듈 파일명...>`을 **한 줄로 한 번** 실행한다. `python3 {SCRIPTS_DIR}/assemble-pack.py`(허용 규칙의 접두어)는 따옴표 없이 경로 규약의 `{SCRIPTS_DIR}` 문자열 그대로 쓰고, 인자는 따옴표를 써도 된다(팩 디렉터리는 큰따옴표). `cd`·`&&`·리다이렉션은 섞지 않는다. vault에 쓰는 Bash는 이 명령 하나뿐이다
    3. 출력 JSON의 `est_tokens_pack`을 넣어 `manifest.json`을 Write한다
+   - 2의 조립이 거부되거나 다시 실행해도 실패하면 **5절이 빈 pack.md를 팩으로 남기지 마라**: manifest.json을 쓰지 말고 아래 Bash 없는 하네스 방식으로 pack.md 전체를 다시 Write하거나, 그것도 못 하면 무장 실패로 보고한다
    - **Bash가 없는 하네스**는 기존 방식대로 `pack.md` 전체(5절 원문 포함)를 Write로 쓴다. 5절은 Read한 원문을 한 글자도 바꾸지 않고 옮기고 마커 형식은 `references/analysis-method.md`의 "원문 무결성 규칙"을 따른다
 5. 그대로 6단계로 진행하라
 

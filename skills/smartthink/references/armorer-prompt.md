@@ -162,14 +162,14 @@ Step A에서 Read한 내용을 기억으로 재입력하면 공백 하나만 어
 파일 쓰기 순서: Step F에서 1절 브리핑까지 확정한 뒤 **pack.md에 대한 Write는 한 번뿐**이다. (1) Write로 1~6절 전체를 쓰되 `## 5. 레퍼런스 원문` 제목 줄 아래 본문은 비워 두고 바로 `## 6. 과거 인사이트와 프로필`로 넘어간다(팩 디렉터리는 이 Write가 만든다) → (2) Bash로 아래 명령을 **한 번** 실행해 5절을 채운다 → (3) 스크립트가 출력한 JSON의 `est_tokens_pack`을 manifest의 `est_tokens.pack`에 쓴다. 스크립트를 돌린 뒤에 Write로 pack.md를 다시 쓰면 파일 전체가 덮어써져 원문이 날아간다.
 
 ```bash
-python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir <팩 디렉터리> --modules core-engines.md meta-cognition.md
+python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir "<팩 디렉터리>" --modules core-engines.md meta-cognition.md
 ```
 
-- 명령은 이 모양 그대로 한 줄로 쓴다. `{SCRIPTS_DIR}`는 Path Variables의 절대경로를 **따옴표 없이** 넣고, `cd`·`&&`·`;`·파이프·리다이렉션·변수 대입·명령 치환을 섞지 마라. `/st init`이 제안하는 Bash 허용 규칙이 이 명령의 앞부분과 글자 그대로 일치해야 프롬프트 없이 실행된다.
-- `--modules`에는 Selected Modules의 파일명(basename, 확장자 포함)을 공백으로 나열한다. 9개 모듈 밖 이름·경로, `{VAULT}/packs/` 바로 아래가 아닌 팩 디렉터리, 이미 본문이 있는 5절은 스크립트가 거부하고 0이 아닌 코드로 끝나며 pack.md를 건드리지 않는다. 그러면 오류 메시지대로 고쳐(5절을 비운 pack.md를 다시 Write하는 등) 한 번 더 실행한다.
+- 명령은 이 모양 그대로 한 줄로 쓴다. `python3 {SCRIPTS_DIR}/assemble-pack.py`까지가 허용 규칙의 접두어다. 이 부분은 **따옴표 없이**, `{SCRIPTS_DIR}`는 Path Variables의 문자열을 **글자 그대로** 쓴다(심링크를 다시 풀거나 줄이거나 `~`로 바꾸지 마라). `/st init`이 같은 `{SCRIPTS_DIR}` 문자열로 규칙(`Bash(python3 <그 경로>/assemble-pack.py *)`)을 만들었고, 끝의 ` *`가 뒤따르는 인자를 따옴표 포함 그대로 받는다. 인자는 따옴표를 써도 되며, 팩 디렉터리는 공백이 있어도 한 인자로 넘어가게 **큰따옴표로 감싼다**. `cd`·`&&`·`;`·파이프·리다이렉션·변수 대입·명령 치환을 섞지 마라. 섞으면 명령이 여러 개로 쪼개져 규칙이 매칭되지 않는다.
+- `--modules`에는 Selected Modules의 파일명(basename, 확장자 포함)을 공백으로 나열한다. 9개 모듈 밖 이름·경로, `packs/`라는 이름의 디렉터리 바로 아래가 아닌 팩 디렉터리(스크립트는 `{VAULT}`를 모르므로 vault 소속까지는 검사하지 않는다. 팩 디렉터리는 Path Variables의 값을 그대로 쓴다), 이미 본문이 있는 5절은 스크립트가 거부하고 0이 아닌 코드로 끝나며 pack.md를 건드리지 않는다. 그러면 오류 메시지대로 고쳐(5절을 비운 pack.md를 다시 Write하는 등) 한 번 더 실행한다.
 - 성공하면 스크립트가 JSON 한 줄(`pack`, `modules`, `bytes`, `est_tokens_pack`)을 출력한다. `modules`가 선택 모듈과 같은지 보는 것으로 검증을 끝낸다.
 - **vault에 쓰는 Bash는 이 스크립트 하나뿐이다.** `mkdir`, heredoc, 셸 리다이렉션 이어 붙이기로 팩 파일을 만들지 마라. `wc`·`grep`·`shasum`·`check-structure.py` 같은 확인용 Bash도 돌리지 마라. 명령마다 권한 프롬프트가 따로 뜬다.
-- 스크립트 실행이 권한 거부로 막히면 다른 방법으로 5절을 채우지 말고 `무장 실패: assemble-pack.py 실행 거부`를 반환한다.
+- 스크립트 실행이 권한 거부로 막히거나 오류를 고쳐 다시 실행해도 실패하면, 다른 방법으로 5절을 채우지 말고 **5절이 빈 pack.md를 팩으로 남기지 마라**: manifest.json을 쓰지 않고 `무장 실패: assemble-pack.py <거부|실패 사유>`를 반환한다(manifest가 없으면 메인이 팩 파일 부재로 보고 폴백한다).
 
 #### `--digest` 모드
 
