@@ -37,6 +37,7 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
   `~/.claude` 밖인 이유는 Claude Code가 `~/.claude` 아래 쓰기를 허용 규칙과 무관하게 묻기 때문이다.
 - init을 거치지 않은 세션(헤드리스 포함)은 후보 탐지를 하지 않는다. resolver가 낸 경로(포인터가
   없으면 기본값)를 `--ensure`로 만들어 그대로 쓴다.
+- 예외: init은 2단계 ⑤에서 경로가 확정되기 전까지 resolver를 `--ensure` 없이 실행한다(⑤ 0번).
 
 - 이미 있는 파일은 **덮어쓰지 않는다.** resolver도 존재 확인 후에만 복사한다.
 - **`.data/` 자체를 사용자 상태 저장소로 쓰지 않는다.** 플러그인 디렉터리는 업데이트 때 통째로
@@ -135,6 +136,8 @@ SKILL.md 경로 규약을 따른다. resolver(`{SCRIPTS_DIR}/resolve-vault.py --
 
 **⑤ vault 경로**는 결정적 탐지 결과를 보여 주고 **사용자가 고른다. 자동 선택 금지.**
 
+0. init은 ⑤에서 경로가 확정되기 전에는 resolver를 `--ensure` 없이 실행한다. 기본 위치에 빈 vault를 미리
+   만들면 다른 곳을 고른 뒤 쓰이지 않는 폴더가 남는다. 시드는 경로 확정 뒤 `--ensure`로 한다.
 1. `python3 "{SCRIPTS_DIR}/resolve-vault.py" --candidates`를 실행한다. JSON의 `candidates[]`가 기존
    노트 보관소 후보이고 `create_new.path`가 새로 만들기(기본값)다. 탐지를 직접 흉내 내지 마라.
 2. 후보를 번호 목록으로 보여 준다. 후보마다 `path`, `signals`(등록 목록·표시 파일·이름), `last_modified`,

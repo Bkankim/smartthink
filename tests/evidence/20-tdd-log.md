@@ -107,3 +107,79 @@ FAIL E. vault: no pre-#20 default vault path in the conventions: 16 mention(s) o
 PASS E. vault: no pre-#20 default vault path in the conventions
 57 passed in 2.58s
 ```
+
+## 완료 기준 출력 (최종 커밋 직전 작업 트리)
+
+```
+$ python3 scripts/check-structure.py; echo "exit=$?"
+PASS A. layout: required paths exist
+PASS A. layout: plugin.json is valid and complete
+PASS A. layout: st-searcher.md removed
+PASS A. layout: st-armorer.md and st-thinker.md exist
+PASS B. references: 9 mental-model modules exist
+PASS B. references: index.json sha256 matches file bytes
+PASS B. references: index.json est_tokens recomputes
+PASS C. agents: frontmatter parses and name matches filename
+PASS C. agents: no model field (session inheritance)
+PASS C. agents: no skills preload
+PASS C. agents: st-thinker effort/maxTurns
+PASS C. agents: st-armorer effort/maxTurns
+PASS C. agents: st-armorer owns the web tools
+PASS C. agents: st-thinker has no web tools
+PASS D. wiring: 6 pack section titles shared verbatim
+PASS D. wiring: 11 manifest fields described on both sides
+PASS D. wiring: spawned sub-agent names resolve to agents/
+PASS D. wiring: plugin namespace on spawns and the /st alias
+PASS D. wiring: referenced references/ files exist
+PASS D. wiring: st-thinker definition and fallback prompt in sync
+PASS D. wiring: thinker-prompt substitution variables
+PASS D. wiring: st-armorer definition and fallback prompt in sync
+PASS D. wiring: section 5 module marker forms match the SSOT
+PASS D. wiring: headless gate signals and branches
+PASS E. schema: evolution-state.md v3 header
+PASS E. schema: profile.md v3 header
+PASS E. schema: profile.md six blocks in order
+PASS E. schema: shipped .data is a blank seed
+PASS E. vault: {VAULT} comes from resolve-vault.py
+PASS E. vault: permission rule is ~/ or // in the resolved settings
+PASS E. vault: no pre-#20 default vault path in the conventions
+PASS F. v2: no --deep mode in SKILL.md
+PASS F. v2: SKILL.md frontmatter has no effort/argument-hint
+PASS F. v2: no legacy prefix alias mapping
+PASS F. v2: no live st-searcher wiring
+PASS G. hygiene: no em dash in editable files
+PASS G. hygiene: no private information
+SKIP H. pack: pack.md and manifest.json exist: no --pack given
+SKIP H. pack: manifest schema and boolean research: no --pack given
+SKIP H. pack: section titles present and ordered: no --pack given
+SKIP H. pack: section 5 verbatim hash integrity: no --pack given
+SKIP H. pack: module markers scoped to section 5: no --pack given
+
+37 passed, 0 failed, 5 skipped
+pack: 0 passed, 0 failed, 5 skipped
+exit=0
+
+$ uv run --with pytest pytest -q tests; echo "exit=$?"
+.........................................................                [100%]
+57 passed in 2.39s
+exit=0
+
+$ git diff main -- . ':!tests/evidence' | grep '^+' | grep -c <em dash>   # 기존 289건은 바이트 불변 9개 모듈 원문(main과 동일)
+0
+
+$ 토큰 흔적 grep (git diff main에서 Anthropic 키 접두어 또는 토큰 변수에 리터럴 값 대입, 완료 기준의 정규식) | wc -l
+0
+
+$ git grep -n 'smartthink-vault' -- . ':!tests/evidence' | cut -c1-90
+CHANGELOG.md:28:  `~/.claude/smartthink-vault/vault-pointer` file > the default. The same 
+tests/gates.md:260:  - 사용자 레벨 정의와 CLAUDE.md·훅을 배제하려고 격리 `CLAUDE_CONFIG_DIR`에서 돌릴 때는 그 디렉터리
+tests/gates.md:346:| 백그라운드 Write에서 권한 프롬프트가 뜨는가 | T9 | **뜬다.** default 권한 모드(상태줄 `⏸ manual
+tests/gates.md:368:| T9 | PASS | 2026-09-27 | T9-fix-prompt-observation.md, T9-fix-setting
+tests/test_check_structure_vault.py:16:OLD_PATH = "~/.claude/" + "smartthink-vault"
+tests/test_check_structure_vault.py:63:        self.append("skills/smartthink/references/l
+tests/test_check_structure_vault.py:64:        self.append("scripts/migrate-evolution.py",
+tests/test_resolve_vault.py:31:        self.old_vault = self.home / ".claude" / "smartthin
+tests/test_resolve_vault.py:383:        self.make_store(".claude/smartthink-vault")
+```
+
+남은 `smartthink-vault` 언급: CHANGELOG.md(이력), gates.md 260행(T12 예시의 옛 위치 보호 deny, "옛 위치(메인테이너 머신 잔존)" 표기), gates.md 346·368행(T9 기록, 다른 워커 소유라 미수정), tests/의 회귀 픽스처(옛 위치를 무시하는지·check가 잡는지 검증하는 입력).

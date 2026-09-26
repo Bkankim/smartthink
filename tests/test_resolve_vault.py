@@ -435,7 +435,7 @@ class CandidatesTest(unittest.TestCase):
         workspace = self.make_store("workspace", ".obsidian", files=2)
         for index in range(30):
             (workspace / f"repo-{index:02d}" / ".git").mkdir(parents=True)
-        real = self.make_store("workspace/vault", files=40)
+        real = self.make_store("workspace/notes", files=40)
         (real / ".git").mkdir()
         self.write_registry("Library/Application Support/obsidian/obsidian.json", str(starter), str(workspace))
 
@@ -445,7 +445,7 @@ class CandidatesTest(unittest.TestCase):
         self.assertEqual(set(found), {str(starter), str(workspace), str(real)})
         self.assertIn("nearly-empty", found[str(starter)]["warnings"])
         self.assertIn("workspace-root", found[str(workspace)]["warnings"])
-        self.assertEqual(found[str(real)]["signals"], ["name:vault"])
+        self.assertEqual(found[str(real)]["signals"], ["name:notes"])
         self.assertEqual(found[str(real)]["warnings"], [])
         self.assertTrue(found[str(real)]["git_repo"])
 
