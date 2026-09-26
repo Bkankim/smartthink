@@ -83,8 +83,9 @@ Each fact lives in exactly one place. Everything else references it.
 
 Two duplications are deliberate, because each side must work when the other is missing: the pack
 section titles and manifest fields, shared by `SKILL.md` and the armorer; and the static instructions
-of the armorer and the thinker, each shared with its fallback prompt. Both are checked mechanically by
-`scripts/check-structure.py`, because a duplicate that drifts is worse than no duplicate at all.
+of the armorer and the thinker, each shared with its fallback prompt. `scripts/check-structure.py` checks
+both with sync checks on key-instruction regexes, section titles and manifest fields (not a full-body
+diff), because a duplicate that drifts is worse than no duplicate at all.
 
 ---
 

@@ -115,7 +115,8 @@ THINKER_SYNC_RULES = (
 )
 
 # Same idea for the armorer: references/armorer-prompt.md is what general-purpose receives
-# when no st-armorer definition resolves, so it must carry the definition's pack contract.
+# when no st-armorer definition resolves. What is checked is a sync of key-instruction regexes
+# (plus the section titles and manifest fields elsewhere), not a full-body diff.
 # Its only substitution slots are the two Path Variables of the SKILL.md 5a Input block.
 ARMORER_PROMPT_VARS = {"SKILL_DIR", "VAULT"}
 ARMORER_SYNC_RULES = (
@@ -124,7 +125,8 @@ ARMORER_SYNC_RULES = (
     ("section 5 copied byte-for-byte with Bash", r"Bash로\s*바이트를\s*이어\s*붙여라"),
     ("single Write to pack.md", r"pack\.md에\s*대한\s*Write는\s*한\s*번뿐"),
     ("research only after reading the references", r"레퍼런스를\s*먼저\s*읽은\s*뒤에\s*검색"),
-    ("40-turn budget", r"40\s*턴"),
+    # Anchored to the body line "턴 예산 40턴." so the fallback preamble's "40턴을" cannot satisfy it.
+    ("40-turn budget", r"턴\s*예산\s*40\s*턴\."),
 )
 
 # Files another worker still owns. A missing or stale entry here reports SKIP instead of
@@ -965,8 +967,9 @@ def check_armorer_prompt_sync() -> Result:
     """references/armorer-prompt.md is the fallback SSOT for the armorer (issue #15).
 
     Without it the main session briefed general-purpose from `git show`, which a copy or
-    plugin-cache install cannot do. The file must carry the definition's load-bearing
-    instructions and use no substitution slot beyond the 5a Path Variables.
+    plugin-cache install cannot do. This checks the definition's key instructions by the
+    ARMORER_SYNC_RULES regexes (not a full-body diff) and that the fallback uses exactly the
+    two 5a Path Variables as substitution slots.
     """
     definition = read_text(ARMORER_MD)
     fallback = read_text(ARMORER_PROMPT_MD)
@@ -999,6 +1002,9 @@ def check_armorer_prompt_sync() -> Result:
             )
 
     found = {match.group(1) for match in re.finditer(r"(?<!\$)\{([A-Z][A-Z0-9_]*)\}", fallback)}
+    absent = sorted(ARMORER_PROMPT_VARS - found)
+    if absent:
+        problems.append("declared substitution variable(s) never used: " + ", ".join(absent))
     unexpected = sorted(found - ARMORER_PROMPT_VARS)
     if unexpected:
         anchors = []
@@ -1053,46 +1059,47 @@ def check_module_marker_forms() -> Result:
     to read. The format now lives in the agent definition too, and this check keeps the copy
     from drifting away from the SSOT.
     """
-    definition = read_text(ARMORER_MD)
     canon = read_text(ANALYSIS_METHOD_MD)
-    if definition is None:
-        return bad(f"{rel(ARMORER_MD)} is missing or unreadable")
     if canon is None:
         return bad(f"{rel(ANALYSIS_METHOD_MD)} is missing or unreadable")
-
-    in_armorer = _marker_shapes(definition)
     in_canon = _marker_shapes(canon)
 
     problems: list[str] = []
     evidence: list[str] = []
-    for kind in MARKER_KINDS:
-        canonical = in_canon[kind]
-        written = in_armorer[kind]
-        if not canonical:
-            problems.append(
-                f"{rel(ANALYSIS_METHOD_MD)} shows no {kind} marker; the SSOT for the section 5 "
-                "format is gone, so there is nothing to check the copy against"
-            )
+    # armorer-prompt.md is what general-purpose writes section 5 from when no definition
+    # resolves (#15), so it carries the same copy of the format and is held to the same SSOT.
+    for path in (ARMORER_MD, ARMORER_PROMPT_MD):
+        definition = read_text(path)
+        if definition is None:
+            problems.append(f"{rel(path)} is missing or unreadable")
             continue
-        if not written:
-            problems.append(
-                f"{rel(ARMORER_MD)} shows no {kind} marker. The armorer writes section 5, so the "
-                f"format must be in its definition, not only in {rel(ANALYSIS_METHOD_MD)}."
-            )
-            continue
-        agreed = written & canonical
-        if not agreed:
-            problems.append(
-                f"{kind} format drifted: {rel(ARMORER_MD)} writes {sorted(written)} but "
-                f"{rel(ANALYSIS_METHOD_MD)} writes {sorted(canonical)}"
-            )
-            continue
-        evidence.append(f"{kind}: {sorted(agreed)[0]}")
+        in_armorer = _marker_shapes(definition)
+        for kind in MARKER_KINDS:
+            canonical = in_canon[kind]
+            written = in_armorer[kind]
+            if not canonical:
+                problems.append(
+                    f"{rel(ANALYSIS_METHOD_MD)} shows no {kind} marker; the SSOT for the section 5 "
+                    "format is gone, so there is nothing to check the copy against"
+                )
+                continue
+            if not written:
+                problems.append(
+                    f"{rel(path)} shows no {kind} marker. The armorer writes section 5, so the "
+                    f"format must be in its definition, not only in {rel(ANALYSIS_METHOD_MD)}."
+                )
+                continue
+            agreed = written & canonical
+            if not agreed:
+                problems.append(
+                    f"{kind} format drifted: {rel(path)} writes {sorted(written)} but "
+                    f"{rel(ANALYSIS_METHOD_MD)} writes {sorted(canonical)}"
+                )
+                continue
+            evidence.append(f"{rel(path)} {kind}: {sorted(agreed)[0]}")
 
     if problems:
-        return bad(
-            f"{len(problems)} of {len(MARKER_KINDS)} module marker forms out of sync", problems
-        )
+        return bad(f"{len(problems)} module marker form problem(s)", problems)
     return ok(
         f"all {len(MARKER_KINDS)} module marker forms match {rel(ANALYSIS_METHOD_MD)}", evidence
     )

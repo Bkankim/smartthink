@@ -10,6 +10,7 @@
 - 명령(Orca 대화형 터미널, 비대화 권한): `cd <TMP>/work && CLAUDE_CONFIG_DIR=<ISOLATED_CONFIG> SMARTTHINK_VAULT=<VAULT> CLAUDE_CODE_OAUTH_TOKEN="$ANTHROPIC_OAUTH_TOKEN" claude --dangerously-skip-permissions --plugin-dir <TMP>/plugin --model opus`. 시작 시 폴더 신뢰 확인과 bypass 확인에 "Yes"로 응답했다.
 - 입력: `/smartthink:smartthink 동네 도서관의 청소년 이용률을 높이는 방안` → 게이트 → `진행`.
 - 스킬 Base directory: `<TMP>/plugin/skills/smartthink`(git 없는 사본 코드, 메인 체크아웃 심링크가 아님).
+- 정리: 증거 추출 뒤 사본 `<TMP>`(plugin·work 포함), 격리 설정, 임시 vault를 `rm -rf`로 삭제했고 세 경로 모두 `No such file or directory`로 부재를 확인했다. 리포의 `agents/st-armorer.md`는 건드리지 않았으므로 복원 확인(restore-check)은 해당 없음.
 
 ## 화면 원문 (`orca terminal read --screen`)
 
