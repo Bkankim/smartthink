@@ -11,7 +11,8 @@ as-is; it never re-derives the path from prose. Precedence:
 3. The default ~/.claude/smartthink-vault.
 
 Output: {"path": "<absolute path>", "source": "env|pointer|default"}
---ensure also creates packs/ and copies the profile and evolution-state templates when absent.
+--ensure also creates packs/ and copies the evolution-state template when absent. profile.md is
+left to `st init`.
 Existing files are never overwritten.
 """
 from __future__ import annotations
@@ -24,7 +25,8 @@ import sys
 from pathlib import Path
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "skills" / "smartthink" / ".data"
-SEED_FILES = ("profile.md", "evolution-state.md")
+# profile.md is deliberately not seeded: its absence is what makes the skill suggest `/st init`.
+SEED_FILES = ("evolution-state.md",)
 
 
 def default_vault() -> Path:
@@ -66,7 +68,7 @@ def ensure(vault: Path) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Print the resolved SmartThink vault as JSON.")
-    parser.add_argument("--ensure", action="store_true", help="create packs/ and seed missing templates")
+    parser.add_argument("--ensure", action="store_true", help="create packs/ and seed a missing evolution-state.md")
     arguments = parser.parse_args()
     vault, source = resolve()
     if arguments.ensure:

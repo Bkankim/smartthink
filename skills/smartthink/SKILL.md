@@ -32,13 +32,11 @@ description: >
 본문과 모든 레퍼런스 문서의 경로 플레이스홀더는 아래로 해석하라.
 
 - `{SKILL_DIR}` - 이 SKILL.md가 있는 디렉터리. `${CLAUDE_SKILL_DIR}` 환경변수가 실제 경로로 해석되면 그 값을 쓰고, 미해석(빈 문자열이거나 리터럴 `${CLAUDE_SKILL_DIR}` 그대로)이면 **이 SKILL.md 파일의 실제 위치에서 추론하라.**
-- `{VAULT}` - 아래 순서로 해석한다.
-  1. profile.md가 선언한 vault 경로 (init 이후의 정본)
-  2. 환경변수 `$SMARTTHINK_VAULT`
-  3. 기본값 `~/.claude/smartthink-vault`
-  - profile.md 자체가 vault 안에 있으므로, 부트스트랩은 2 → 3 순으로 후보 경로를 잡아 그 안의 `profile.md`를 읽고, profile.md가 다른 vault 경로를 선언하면 그 값으로 재해석한다.
+- `{SCRIPTS_DIR}` - 심링크를 푼 `{SKILL_DIR}`의 두 단계 위 `scripts/`. `"$(cd "{SKILL_DIR}" && pwd -P)/../../scripts"`로 구한다. 작업 디렉터리 기준 상대경로 `scripts/`를 쓰지 마라.
+- `{VAULT}` - **resolver를 Bash로 실행해 나온 path만 쓴다. 해석하지 마라.**
+  `python3 "{SCRIPTS_DIR}/resolve-vault.py" --ensure`가 출력한 JSON의 `path`가 `{VAULT}`다. `--ensure`가 `packs/`와 빈 `evolution-state.md`를 만든다(`profile.md`는 만들지 않는다). 우선순위·폴백 규칙의 정본은 그 스크립트다. 디렉터리가 비어 있다거나 테스트용처럼 보인다는 이유로 다른 경로를 고르지 마라.
+  - **Bash가 없는 하네스(인라인 경로)만** 직접 정한다: `$SMARTTHINK_VAULT`가 비어 있지 않으면 그 경로 → 아니면 `~/.claude/smartthink-vault/vault-pointer`의 첫 줄 절대경로 → 아니면 `~/.claude/smartthink-vault`. **설정된 env vault는 비어 있거나 없어도 그대로 쓴다. 폴백 금지.** 없으면 `packs/`를 만들어 시드한다.
 - 팩 경로 - `{VAULT}/packs/<YYYY-MM-DD>-<슬러그>/`
-- `{VAULT}`에 쓰기 전 디렉터리가 없으면 `mkdir -p`로 생성하라. vault 자체가 없으면 시드(빈 `packs/`)를 만들고 진행하라.
 
 ---
 

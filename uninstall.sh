@@ -6,7 +6,7 @@ AGENTS_SOURCE="$SCRIPT_DIR/agents"
 SKILL_TARGET="$HOME/.claude/skills/smartthink"
 AGENTS_TARGET="$HOME/.claude/agents"
 COMMANDS_TARGET="$HOME/.claude/commands"
-VAULT="${SMARTTHINK_VAULT:-$HOME/.claude/smartthink-vault}"
+VAULT="$(python3 "$SCRIPT_DIR/scripts/resolve-vault.py" | python3 -c 'import json, sys; print(json.load(sys.stdin)["path"])')"
 AGENT_FILES=(st-thinker.md st-armorer.md)
 COMMAND_FILES=(st.md)
 

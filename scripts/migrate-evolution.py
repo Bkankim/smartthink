@@ -17,6 +17,7 @@ without touching either file until --force replaces it.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import math
 import os
@@ -88,13 +89,15 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def resolve_path(argument: Path | None) -> Path | None:
-    # Return the explicit target or the first existing default vault target.
+    # Return the explicit target, or the resolved vault's state file. Never another vault's.
     if argument is not None:
         return argument
-    vault = os.environ.get("SMARTTHINK_VAULT")
-    candidates = [Path(vault) / "evolution-state.md"] if vault else []
-    candidates.append(Path.home() / ".claude" / "smartthink-vault" / "evolution-state.md")
-    return next((candidate for candidate in candidates if candidate.is_file()), None)
+    spec = importlib.util.spec_from_file_location("resolve_vault", Path(__file__).with_name("resolve-vault.py"))
+    resolver = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(resolver)
+    vault, _source = resolver.resolve()
+    candidate = vault / "evolution-state.md"
+    return candidate if candidate.is_file() else None
 
 
 def split_sections(text: str) -> tuple[str, tuple[Section, ...]]:
@@ -299,7 +302,7 @@ def main() -> int:
     arguments = parse_arguments()
     target = resolve_path(arguments.path)
     if target is None:
-        print("error: provide evolution-state.md or set SMARTTHINK_VAULT to an existing vault", file=sys.stderr)
+        print("error: the resolved vault has no evolution-state.md; pass its path explicitly", file=sys.stderr)
         return 2
     try:
         original = target.read_bytes()

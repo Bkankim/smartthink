@@ -30,11 +30,10 @@
 
 ## `{VAULT}` 해석 규칙
 
-우선순위대로 확인한다.
-
-1. `st init`에서 사용자가 지정한 경로
-2. 환경 변수 `$SMARTTHINK_VAULT`
-3. 기본값 `~/.claude/smartthink-vault`
+정본은 `scripts/resolve-vault.py`다. 스킬은 그 출력(`path`)만 쓴다. 요약하면
+`$SMARTTHINK_VAULT`(설정돼 있으면 비어 있어도 그대로, 폴백 없음) > `~/.claude/smartthink-vault/vault-pointer`
+(`st init`이 기본값이 아닌 경로를 확정하면 기록) > 기본값 `~/.claude/smartthink-vault` 순이다.
+`profile.md`의 vault 경로 필드는 표시용이며 해석에 쓰이지 않는다.
 
 기존에 쓰던 vault(Obsidian 등)가 있으면 그 안의 `smartthink/` 하위 디렉터리를 쓴다(D29).
 이때 **기존 vault를 훼손하지 않는다.** 기존 파일·디렉터리 구조는 그대로 두고 `profile.md`와

@@ -100,7 +100,7 @@ class ResolveVaultTest(unittest.TestCase):
 
         self.assertEqual(result, {"path": str(self.default_vault), "source": "default"})
 
-    def test_ensure_seeds_templates_without_overwriting(self) -> None:
+    def test_ensure_never_overwrites_existing_state(self) -> None:
         vault = self.root / "vault"
         vault.mkdir()
         (vault / "evolution-state.md").write_text("kept\n", encoding="utf-8")
@@ -108,11 +108,19 @@ class ResolveVaultTest(unittest.TestCase):
         self.run_resolver("--ensure", vault_env=str(vault))
 
         self.assertEqual((vault / "evolution-state.md").read_text(encoding="utf-8"), "kept\n")
-        self.assertEqual(
-            (vault / "profile.md").read_bytes(),
-            (TEMPLATES / "profile.md").read_bytes(),
-        )
         self.assertTrue((vault / "packs").is_dir())
+
+    def test_ensure_seeds_evolution_state_but_not_profile(self) -> None:
+        # A missing profile.md is the signal that makes the skill suggest `/st init`.
+        vault = self.root / "vault"
+
+        self.run_resolver("--ensure", vault_env=str(vault))
+
+        self.assertEqual(
+            (vault / "evolution-state.md").read_bytes(),
+            (TEMPLATES / "evolution-state.md").read_bytes(),
+        )
+        self.assertFalse((vault / "profile.md").exists())
 
 
 if __name__ == "__main__":
