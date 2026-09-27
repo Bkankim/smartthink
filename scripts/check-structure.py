@@ -1086,23 +1086,50 @@ def check_armorer_assembles_with_script() -> Result:
 
 # Docs whose Bash a session runs while arming or in a subcommand (issue #26).
 SESSION_BASH_DOCS = (SKILL_MD, REFERENCES_DIR / "lifecycle.md", ARMORER_MD, ARMORER_PROMPT_MD)
-# A code line or inline span is taken as a shell command when its first word is one of these.
+# A code line or inline span is taken as a shell command when its first word (after any leading
+# VAR=value assignments) is one of these or a script path. `claude -p` and `codex exec` stay out:
+# the docs name them for the caller that starts a run, never for the session to type (issue #28 2).
 SHELL_COMMAND_WORDS = {
-    "awk", "cat", "cd", "cp", "date", "echo", "find", "git", "grep", "head", "ls", "mkdir", "mv",
-    "pip", "printf", "python", "python3", "readlink", "realpath", "rm", "sed", "shasum", "stat",
-    "tail", "tee", "test", "touch", "uv", "wc",
+    "awk", "basename", "bash", "cat", "cd", "chmod", "command", "cp", "curl", "cut", "date", "diff",
+    "dirname", "du", "echo", "env", "eval", "exec", "file", "find", "git", "grep", "head", "jq", "ln",
+    "ls", "mkdir", "mv", "node", "nohup", "npx", "open", "pip", "pnpm", "printf", "pwd", "python",
+    "python3", "readlink", "realpath", "rm", "sed", "sh", "sha256sum", "shasum", "sort", "source",
+    "stat", "sudo", "tail", "tar", "tee", "test", "time", "touch", "tr", "uniq", "uv", "wc", "which",
+    "xargs", "zsh",
 }
+# A fenced block in one of these languages is all commands, whatever each line starts with.
+SHELL_FENCE_LANGS = {"bash", "sh", "shell", "zsh", "console"}
+SCRIPT_PATH_RE = re.compile(r"^(?:\{[A-Z_]+\}|~|\.{1,2})?/\S*\.(?:py|sh)$")
+ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=\S*$")
 FENCE_RE = re.compile(r"^[ \t>]*```[ \t]*(?P<lang>[\w-]*)[^\n]*\n(?P<body>.*?)^[ \t>]*```", re.M | re.S)
 INLINE_CODE_RE = re.compile(r"(?<!`)`(?P<code>[^`\n]+)`(?!`)")
+# A doc placeholder such as <모듈 파일명...> or <SETTINGS>, not a redirection.
+PLACEHOLDER_RE = re.compile(r"<[^<>\n]*[^<>\s\d&][^<>\n]*>")
 
 
 def _compound_operator(command: str) -> str | None:
-    """The first ; && || or | outside quotes in a shell command line, or None."""
+    """The first shape that splits or rewrites a shell command line, or None.
+
+    ; && || and | chain commands. Redirection (> >> < <<), $(...), backticks, a trailing & and a
+    leading VAR=value leave one command whose text no longer starts with the allow rule's prefix
+    (issue #28 1). Single quotes make all of these an argument; double quotes still expand $( and `.
+    """
+    first = command.split(" ", 1)[0]
+    if ASSIGNMENT_RE.match(first):
+        return f"{first.split('=', 1)[0]}="
+    command = PLACEHOLDER_RE.sub(lambda match: "x" * len(match.group(0)), command)
     quote = ""
     index = 0
     while index < len(command):
         char = command[index]
-        if quote:
+        if quote == "'":
+            if char == "'":
+                quote = ""
+        elif command.startswith("$(", index):
+            return "$("
+        elif char == "`":
+            return "`"
+        elif quote:
             if char == quote:
                 quote = ""
         elif char in "'\"":
@@ -1115,24 +1142,72 @@ def _compound_operator(command: str) -> str | None:
             return "||"
         elif char == "|":
             return "|"
+        elif command.startswith(">>", index) or command.startswith("<<", index):
+            return command[index : index + 2]
+        elif char in "<>":
+            return char
+        elif char == "&":
+            return "&"
         index += 1
     return None
 
 
-def _shell_commands(text: str) -> list[tuple[int, str]]:
-    """(offset, line) for every fenced code line and inline code span that reads as a command."""
-    found: list[tuple[int, str]] = []
+def _command_word(command: str) -> str:
+    """The word a shell runs: the first one after any leading VAR=value assignments."""
+    for word in command.split():
+        if not ASSIGNMENT_RE.match(word):
+            return word
+    return ""
+
+
+def _is_command(command: str) -> bool:
+    word = _command_word(command)
+    return word in SHELL_COMMAND_WORDS or bool(SCRIPT_PATH_RE.match(word))
+
+
+def _shell_commands(text: str) -> list[tuple[int, str, bool]]:
+    """(offset, line, in_shell_fence) for every code line and inline span that reads as a command.
+
+    Every non-comment line of a bash/sh fence is a command, one-word lines included; elsewhere a
+    line or span counts only when _is_command says so (issue #28 2).
+    """
+    found: list[tuple[int, str, bool]] = []
     fenced: list[tuple[int, int]] = []
     for block in FENCE_RE.finditer(text):
         fenced.append(block.span())
+        shell = block.group("lang").lower() in SHELL_FENCE_LANGS
         offset = block.start("body")
         for line in block.group("body").splitlines(keepends=True):
-            found.append((offset, line.strip()))
+            command = line.strip()
+            if command and not command.startswith("#") and (shell or _is_command(command)):
+                found.append((offset, command, shell))
             offset += len(line)
     for span in INLINE_CODE_RE.finditer(text):
-        if not any(start <= span.start() < end for start, end in fenced):
-            found.append((span.start(), span.group("code").strip()))
-    return [(offset, line) for offset, line in found if line.split(" ", 1)[0] in SHELL_COMMAND_WORDS]
+        command = span.group("code").strip()
+        if not any(start <= span.start() < end for start, end in fenced) and _is_command(command):
+            found.append((span.start(), command, False))
+    return found
+
+
+def _named_as_one_word(command: str, in_shell_fence: bool) -> bool:
+    """A lone word in prose (`ls`, `date`) names a tool; on its own shell-fence line it runs one."""
+    return not in_shell_fence and len(command.split()) < 2
+
+
+def _forbidden_in_sentence(text: str, offset: int) -> bool:
+    """A forbidding word follows the command inside the sentence that holds it (issue #28 3).
+
+    Docs keep a paragraph on one line, so the whole line is too wide a scope: a prohibition in one
+    sentence would clear a command the next sentence tells the session to run. Code spans are
+    blanked first so a . or | inside a command does not end the sentence.
+    """
+    start = text.rfind("\n", 0, offset) + 1
+    end = text.find("\n", offset)
+    line = text[start:end if end >= 0 else None]
+    masked = INLINE_CODE_RE.sub(lambda match: "`" + "x" * len(match.group("code")) + "`", line)
+    here = offset - start
+    right = SENTENCE_END_RE.search(masked, here)
+    return bool(PROHIBITION_RE.search(masked, here, right.start() if right else len(masked)))
 
 
 def check_session_bash_single_commands() -> Result:
@@ -1143,12 +1218,13 @@ def check_session_bash_single_commands() -> Result:
         if text is None:
             problems.append(f"{rel(path)} is missing or unreadable")
             continue
-        for offset, command in _shell_commands(text):
+        for offset, command, _ in _shell_commands(text):
             operator = _compound_operator(command)
             if operator:
                 problems.append(
-                    f"{rel(path)}:{line_of(text, offset)} chains commands with '{operator}' "
-                    f"({command[:70]}); allow rules do not match compound lines, run one command per call"
+                    f"{rel(path)}:{line_of(text, offset)} uses '{operator}' ({command[:70]}); allow rules "
+                    "match one plain command, so run one command per call with no redirection, "
+                    "substitution, & or VAR= prefix"
                 )
     if problems:
         return bad(f"{len(problems)} compound shell command(s)", problems)
@@ -1160,8 +1236,10 @@ def check_session_bash_single_commands() -> Result:
 BUNDLE_COMMAND_RE = re.compile(
     r"^(?:python3 \{SCRIPTS_DIR\}/(?:resolve-vault\.py|assemble-pack\.py|<)|readlink \{SKILL_DIR\})"
 )
-# A command named on a line that forbids it is a prohibition, not an instruction.
+# A command named in a sentence that forbids it is a prohibition, not an instruction.
 PROHIBITION_RE = re.compile(r"마라|말고|금지|않는다|하지 않")
+# A sentence ends at . ! ? before a space or line end, or at a table cell border.
+SENTENCE_END_RE = re.compile(r"[.!?](?=\s|$)|\s\|(?=\s|$)")
 
 
 def check_skill_bash_inside_bundle() -> Result:
@@ -1170,12 +1248,10 @@ def check_skill_bash_inside_bundle() -> Result:
     if text is None:
         return bad(f"{rel(SKILL_MD)} is missing or unreadable")
     problems: list[str] = []
-    for offset, command in _shell_commands(text):
-        if len(command.split()) < 2 or BUNDLE_COMMAND_RE.match(command):
+    for offset, command, in_shell_fence in _shell_commands(text):
+        if _named_as_one_word(command, in_shell_fence) or BUNDLE_COMMAND_RE.match(command):
             continue
-        start = text.rfind("\n", 0, offset) + 1
-        end = text.find("\n", offset)
-        if PROHIBITION_RE.search(text[start:end if end >= 0 else None]):
+        if _forbidden_in_sentence(text, offset):
             continue
         problems.append(
             f"{rel(SKILL_MD)}:{line_of(text, offset)} tells the session to run `{command[:60]}`, which no "
@@ -1200,12 +1276,12 @@ def check_lifecycle_bash_inventory() -> Result:
     if text is None:
         return bad(f"{rel(path)} is missing or unreadable")
     problems: list[str] = []
-    for offset, command in _shell_commands(text):
-        if len(command.split()) < 2 or BUNDLE_COMMAND_RE.match(command) or LIFECYCLE_EXCEPTION_RE.match(command):
+    for offset, command, in_shell_fence in _shell_commands(text):
+        if _named_as_one_word(command, in_shell_fence):
             continue
-        start = text.rfind("\n", 0, offset) + 1
-        end = text.find("\n", offset)
-        if PROHIBITION_RE.search(text[start:end if end >= 0 else None]):
+        if BUNDLE_COMMAND_RE.match(command) or LIFECYCLE_EXCEPTION_RE.match(command):
+            continue
+        if _forbidden_in_sentence(text, offset):
             continue
         problems.append(
             f"{rel(path)}:{line_of(text, offset)} tells the session to run `{command[:60]}`, which is neither in "
