@@ -33,6 +33,25 @@ COMPOUND_BLOCKS = (
     "```bash\ncat {SETTINGS} | python3 -m json.tool\n```",
 )
 COMPOUND_INLINE = "확인은 `ls {VAULT}/packs; grep -n '^## ' {VAULT}/packs/p/pack.md`로 한다.\n"
+# Issue #28 1: single-looking lines the shell still splits or rewrites, so a prefix rule misses them.
+RULE_BREAKING_BLOCKS = (
+    "```bash\npython3 {SCRIPTS_DIR}/resolve-vault.py --ensure > /tmp/v.json\n```",
+    "```bash\npython3 {SCRIPTS_DIR}/resolve-vault.py --ensure >> /tmp/v.json\n```",
+    "```bash\npython3 {SCRIPTS_DIR}/resolve-vault.py --ensure 2>/dev/null\n```",
+    "```bash\ncat <<EOF\n```",
+    "```bash\npython3 {SCRIPTS_DIR}/resolve-vault.py --vault $(pwd)\n```",
+    '```bash\npython3 {SCRIPTS_DIR}/resolve-vault.py --vault "$(pwd)"\n```',
+    "```bash\npython3 {SCRIPTS_DIR}/resolve-vault.py --vault `pwd`\n```",
+    "```bash\npython3 {SCRIPTS_DIR}/resolve-vault.py --ensure &\n```",
+    "`X=y python3 {SCRIPTS_DIR}/resolve-vault.py --ensure`를 실행한다.",
+)
+# Issue #28 2: commands whose first word the old word list did not know, or a one-word fenced line.
+UNLISTED_BLOCKS = (
+    "```bash\nbash -c 'ls {VAULT}'\n```",
+    "`jq . {VAULT}/manifest.json`으로 본다.",
+    "`{SCRIPTS_DIR}/resolve-vault.py --ensure`를 실행한다.",
+    "```bash\npwd\n```",
+)
 
 
 class SessionBashCheckTest(unittest.TestCase):
@@ -88,6 +107,54 @@ class SessionBashCheckTest(unittest.TestCase):
         for target in (SKILL, LIFECYCLE, ARMORER, FALLBACK):
             with self.subTest(target=str(target)):
                 self.assert_fails_with(target, COMPOUND_INLINE)
+
+    def test_redirection_substitution_background_and_assignment_fail(self) -> None:
+        for block in RULE_BREAKING_BLOCKS:
+            with self.subTest(block=block):
+                self.assert_fails_with(SKILL, block)
+        with self.subTest(target=str(ARMORER)):
+            self.assert_fails_with(ARMORER, "`python3 {SCRIPTS_DIR}/assemble-pack.py --pack-dir x > /tmp/x`로 조립한다.")
+
+    def test_unlisted_first_words_fail_the_bundle_checks(self) -> None:
+        for target, row in ((SKILL, BUNDLE_LINE), (LIFECYCLE, LIFECYCLE_LINE)):
+            for block in UNLISTED_BLOCKS:
+                with self.subTest(target=str(target), block=block):
+                    path = self.copy / target
+                    original = path.read_text(encoding="utf-8")
+                    path.write_text(original + "\n" + block + "\n", encoding="utf-8")
+                    try:
+                        result = self.run_checker()
+                    finally:
+                        path.write_text(original, encoding="utf-8")
+                    self.assertEqual(result.returncode, 1, result.stdout)
+                    rows = [line for line in result.stdout.splitlines() if row in line]
+                    self.assertEqual(len(rows), 1, result.stdout)
+                    self.assertTrue(rows[0].startswith("FAIL"), result.stdout)
+
+    def test_prohibition_exempts_only_its_own_sentence(self) -> None:
+        # Issue #28 3: docs put a whole paragraph on one line, so a forbidding word anywhere on it
+        # used to exempt every command on it, including one the next sentence tells the session to run.
+        cases = (
+            (SKILL, BUNDLE_LINE, "`wc -c`로 재지 마라. 대신 `ls -la {VAULT}/packs`로 확인한다."),
+            (SKILL, BUNDLE_LINE, "`ls -la {VAULT}/packs`로 확인한다. `wc -c`로 재지 마라."),
+            (LIFECYCLE, LIFECYCLE_LINE, "`wc -c`는 쓰지 않는다. 최근 팩은 `ls -la {VAULT}/packs`로 본다."),
+            (LIFECYCLE, LIFECYCLE_LINE, "| 팩 | `ls -la {VAULT}/packs`로 본다 | `wc -c`로 재지 마라 |"),
+        )
+        for target, row, line in cases:
+            with self.subTest(line=line):
+                path = self.copy / target
+                original = path.read_text(encoding="utf-8")
+                path.write_text(original + "\n" + line + "\n", encoding="utf-8")
+                try:
+                    result = self.run_checker()
+                finally:
+                    path.write_text(original, encoding="utf-8")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                rows = [out for out in result.stdout.splitlines() if row in out]
+                self.assertEqual(len(rows), 1, result.stdout)
+                self.assertTrue(rows[0].startswith("FAIL"), result.stdout)
+                self.assertIn("ls -la", rows[0] + result.stdout)
+                self.assertNotIn("`wc -c`", result.stdout)
 
     def test_skill_md_bash_outside_the_rule_bundle_fails(self) -> None:
         # final-review 20260927-064432 (a)1: the index.json fallback told the main session to run
@@ -145,7 +212,8 @@ class SessionBashCheckTest(unittest.TestCase):
         path = self.copy / SKILL
         path.write_text(
             path.read_text(encoding="utf-8")
-            + "\n`grep -n '^## [0-9]\\. |x' pack.md`, `&&`, `;` 같은 연산자를 섞지 마라.\n",
+            + "\n`grep -n '^## [0-9]\\. |x' pack.md`, `&&`, `;` 같은 연산자를 섞지 마라.\n"
+            + "`grep -n '> $(x) & <<' pack.md`처럼 작은따옴표 안의 연산자도 확인용 Bash로 쓰지 마라.\n",
             encoding="utf-8",
         )
         result = self.run_checker()
