@@ -20,6 +20,16 @@ CHECK_LINE = "E. schema: run goal asked at the gate, not in init"
 INIT_ROW_NOW = "| ② | (결번) 이번 작업의 목표는 init이 묻지 않고 무장 게이트가 받는다(#30) | - |"
 INIT_ROW_OLD = "| ② | 현재 목표 | 2. 현재 목표 |"
 GATE_QUESTION = "   이번에 무엇을 하려는가? (목표·성공 기준 한 줄)\n"
+ARMORER = Path("agents") / "st-armorer.md"
+FALLBACK = Path("skills") / "smartthink" / "references" / "armorer-prompt.md"
+# code-review of PR #32: the gate asked for the goal but the Input template, the pack spec and the
+# armorer's topic-only rule still said A/B/C, so the answer never reached pack section 2.
+GOAL_HANDOFF = (
+    (SKILL, "주제만 온 경우 게이트에서 답한 목표(목표·성공 기준)가 있으면 그 목표, 없으면 예상 작업 A/B/C}"),
+    (SKILL, "주제만 온 경우 게이트에서 답한 목표가 있으면 그 목표의 재진술, 없으면 예상 작업 A/B/C)"),
+    (ARMORER, "Interpretation에 게이트에서 답한 목표(목표·성공 기준)가 있으면"),
+    (FALLBACK, "Interpretation에 게이트에서 답한 목표(목표·성공 기준)가 있으면"),
+)
 
 
 class GoalAtGateCheckTest(unittest.TestCase):
@@ -71,6 +81,19 @@ class GoalAtGateCheckTest(unittest.TestCase):
         result = self.run_checker()
         self.assertNotEqual(result.returncode, 0, result.stdout)
         self.assertTrue(self.line_for(result.stdout).startswith("FAIL"), result.stdout)
+
+    def test_goal_answer_dropped_on_the_way_to_the_pack_fails(self) -> None:
+        for target, phrase in GOAL_HANDOFF:
+            with self.subTest(target=str(target), phrase=phrase[:30]):
+                path = self.copy / target
+                original = path.read_text(encoding="utf-8")
+                self.replace(target, phrase, phrase.replace("게이트에서 답한 목표", "예상 작업"))
+                try:
+                    result = self.run_checker()
+                finally:
+                    path.write_text(original, encoding="utf-8")
+                self.assertNotEqual(result.returncode, 0, result.stdout)
+                self.assertTrue(self.line_for(result.stdout).startswith("FAIL"), result.stdout)
 
 
 if __name__ == "__main__":
