@@ -1492,6 +1492,15 @@ def check_profile_blocks() -> Result:
 # Issue #30: the run's goal is asked at the arming gate, not in the init interview.
 INIT_GOAL_ROW_RE = re.compile(r"^\|\s*②\s*\|\s*현재\s*목표\s*\|", re.M)
 GATE_GOAL_QUESTION = "이번에 무엇을 하려는가"
+# Where a topic-only run's answer to that question must travel to reach pack section 2: the line
+# that names it (a marker) must say to prefer the goal answered at the gate over A/B/C.
+GATE_GOAL_ANSWER = "게이트에서 답한 목표"
+GOAL_HANDOFF_LINES = (
+    (SKILL_MD, "- **Interpretation**:"),
+    (SKILL_MD, "    2. 작업 해석 ("),
+    (ARMORER_MD, "- **주제만 온 경우**:"),
+    (ARMORER_PROMPT_MD, "- **주제만 온 경우**:"),
+)
 
 
 def check_goal_asked_at_gate() -> Result:
@@ -1517,9 +1526,23 @@ def check_goal_asked_at_gate() -> Result:
             problems.append(f"{rel(SKILL_MD)} gate item 1 has no '{GATE_GOAL_QUESTION}' goal question")
         else:
             evidence.append(f"{rel(SKILL_MD)}:{line_of(skill, skill.find(GATE_GOAL_QUESTION, gate))} gate goal question")
+    for path, marker in GOAL_HANDOFF_LINES:
+        text = read_text(path)
+        if text is None:
+            problems.append(f"{rel(path)} is missing or unreadable")
+            continue
+        start = text.find("\n" + marker)
+        line = text[start + 1 : text.find("\n", start + 1)] if start >= 0 else ""
+        if GATE_GOAL_ANSWER not in line:
+            problems.append(
+                f"{rel(path)}: the '{marker.strip()}' line does not carry the {GATE_GOAL_ANSWER} to pack section 2"
+            )
     if problems:
-        return bad("the run's goal is not taken at the arming gate", problems)
-    return ok("init interview has no current-goal question; gate item 1 asks it", evidence)
+        return bad("the run's goal is not taken at the arming gate or does not reach the pack", problems)
+    return ok(
+        "init interview has no current-goal question; gate item 1 asks it and the answer reaches pack section 2",
+        evidence,
+    )
 
 
 def check_data_is_empty_seed() -> Result:
