@@ -1489,6 +1489,39 @@ def check_profile_blocks() -> Result:
     )
 
 
+# Issue #30: the run's goal is asked at the arming gate, not in the init interview.
+INIT_GOAL_ROW_RE = re.compile(r"^\|\s*②\s*\|\s*현재\s*목표\s*\|", re.M)
+GATE_GOAL_QUESTION = "이번에 무엇을 하려는가"
+
+
+def check_goal_asked_at_gate() -> Result:
+    """init does not ask for the current goal; gate item 1 does."""
+    lifecycle = REFERENCES_DIR / "lifecycle.md"
+    problems: list[str] = []
+    evidence: list[str] = []
+    text = read_text(lifecycle)
+    if text is None:
+        problems.append(f"{rel(lifecycle)} is missing or unreadable")
+    else:
+        for match in INIT_GOAL_ROW_RE.finditer(text):
+            problems.append(
+                f"{rel(lifecycle)}:{line_of(text, match.start())} init interview asks for the current goal again"
+            )
+    skill = read_text(SKILL_MD)
+    if skill is None:
+        problems.append(f"{rel(SKILL_MD)} is missing or unreadable")
+    else:
+        gate = skill.find("1. 입력 해석")
+        end = skill.find("2. 진단", gate)
+        if gate < 0 or end < 0 or GATE_GOAL_QUESTION not in skill[gate:end]:
+            problems.append(f"{rel(SKILL_MD)} gate item 1 has no '{GATE_GOAL_QUESTION}' goal question")
+        else:
+            evidence.append(f"{rel(SKILL_MD)}:{line_of(skill, skill.find(GATE_GOAL_QUESTION, gate))} gate goal question")
+    if problems:
+        return bad("the run's goal is not taken at the arming gate", problems)
+    return ok("init interview has no current-goal question; gate item 1 asks it", evidence)
+
+
 def check_data_is_empty_seed() -> Result:
     """The plugin ships templates, never real user state."""
     path = DATA_DIR / "evolution-state.md"
@@ -2148,6 +2181,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("E", "schema: evolution-state.md v3 header", check_evolution_state_schema),
     ("E", "schema: profile.md v3 header", check_profile_schema),
     ("E", "schema: profile.md six blocks in order", check_profile_blocks),
+    ("E", "schema: run goal asked at the gate, not in init", check_goal_asked_at_gate),
     ("E", "schema: shipped .data is a blank seed", check_data_is_empty_seed),
     ("E", "vault: {VAULT} comes from resolve-vault.py", check_vault_resolver_wiring),
     ("E", "vault: permission rule is ~/ or // in the resolved settings", check_permission_rule_format),

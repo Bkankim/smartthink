@@ -103,7 +103,7 @@ not the `status` subcommand.
 
 | Subcommand | What it does |
 |---|---|
-| `/st init` | Local scan plus a short six-question interview, imprints your profile. Idempotent: an existing profile goes into update mode |
+| `/st init` | Local scan plus a short five-question interview, imprints your profile. Idempotent: an existing profile goes into update mode |
 | `/st retain` | Infers from the session which frames actually changed your mind, proposes routing, insight and profile deltas, writes only what you approve |
 | `/st status` | Profile summary, recent packs, evolution counts, environment diagnosis. Read-only |
 
@@ -219,12 +219,12 @@ SmartThink adapts to you across three layers.
 
 | Layer | What it holds | Who writes it |
 |---|---|---|
-| Profile | Identity, current goals, style, defaults, sources, history summary | `/st init`, and you: it is meant to be hand-edited |
+| Profile | Identity, current goals, style, defaults, sources, history summary | `/st init`, and you: it is meant to be hand-edited. init does not ask for current goals; retain proposes them or you write them. Each run's goal is taken at the arming gate |
 | Routing weights, insights, gaps | Which modules actually work for which kind of thinking, plus insight and gap slots | `/st retain`, only what you approve |
 | Pack cache | Every pack ever built, reloadable with `--pack` | Each arming run |
 
 - **`/st init`** scans locally (project root instruction files, `~/.claude`, 50 git log entries, and
-  a notes directory if you name one), shows you what it inferred, asks six short questions you can
+  a notes directory if you name one), shows you what it inferred, asks five short questions you can
   skip entirely, and writes the profile. For the vault question it lists note stores it found under
   your home (Obsidian's vault list, `.obsidian`/`.logseq`/`dendron.yml`/`.foam` markers, folders
   named like vault or notes, with warnings for stale, near-empty or multi-repo folders) and lets you
