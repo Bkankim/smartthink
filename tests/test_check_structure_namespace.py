@@ -24,6 +24,7 @@ CHECK_LINE = "D. wiring: plugin namespace on spawns and the /st alias"
 # The anchor each file's list-first rule line carries.
 SKILL_ANCHOR = "세션 에이전트 목록"
 ALIAS_ANCHOR = "available skills list"
+ALIAS_TIE_BREAK = "If both are listed"
 
 
 class ListFirstNameResolutionTest(unittest.TestCase):
@@ -74,6 +75,15 @@ class ListFirstNameResolutionTest(unittest.TestCase):
 
     def test_alias_without_list_first_rule_fails(self) -> None:
         self.drop_anchor_lines(ALIAS, ALIAS_ANCHOR)
+        result = self.run_checker()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertTrue(self.line_for(result.stdout, CHECK_LINE).startswith("FAIL"))
+        self.assertIn(str(ALIAS), result.stdout)
+
+    def test_alias_without_both_listed_tie_break_fails(self) -> None:
+        # code-review: with both names listed, a bare call runs the user-level skill that
+        # shadows the plugin one (T11). The alias must say the prefixed name wins.
+        self.drop_anchor_lines(ALIAS, ALIAS_TIE_BREAK)
         result = self.run_checker()
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertTrue(self.line_for(result.stdout, CHECK_LINE).startswith("FAIL"))
