@@ -830,20 +830,49 @@ def check_namespaced_invocation() -> Result:
     else:
         evidence.append(f"{rel(SKILL_MD)}:{retry_rule} bare-name retry rule")
 
+    # Trying the prefixed name first costs a non-plugin install one failed spawn on every
+    # run. The harness already lists the registered name, so the list decides first and
+    # the retry only covers runtimes that show no list.
+    list_first = find_lines(text, "세션 에이전트 목록")
+    if not list_first:
+        problems.append(
+            f"{rel(SKILL_MD)} states no list-first rule (세션 에이전트 목록); a non-plugin "
+            "install pays one failed spawn per run before the bare-name retry"
+        )
+    else:
+        evidence.append(f"{rel(SKILL_MD)}:{list_first[0]} list-first name rule")
+
     # The /st alias is the other half of the same collision: a bare `smartthink` call
     # from a plugin command leaks to whatever else owns that name (gate T11).
     command_md = REPO_ROOT / "commands" / "st.md"
     command_text = read_text(command_md)
     if command_text is None:
         problems.append(f"{rel(command_md)} is missing or unreadable")
-    elif f"{prefix}{plugin_namespace()}" not in command_text:
-        problems.append(
-            f"{rel(command_md)} does not invoke {prefix}{plugin_namespace()}; the alias would "
-            "resolve to whatever else owns the bare skill name"
-        )
     else:
-        hits = find_lines(command_text, f"{prefix}{plugin_namespace()}")
-        evidence.append(f"{rel(command_md)}:{hits[0]} invokes {prefix}{plugin_namespace()}")
+        # A bare mention elsewhere is not enough: the line that decides between the two
+        # listed names has to send the call to the prefixed one.
+        prefixed_skill = f"`{prefix}{plugin_namespace()}`"
+        hits = [
+            number
+            for number, line in enumerate(command_text.splitlines(), start=1)
+            if "If both are listed" in line and prefixed_skill in line
+        ]
+        if not hits:
+            problems.append(
+                f"{rel(command_md)} does not send the call to {prefixed_skill} when both names "
+                "are listed; the alias would resolve to whatever else owns the bare skill name"
+            )
+        else:
+            evidence.append(f"{rel(command_md)}:{hits[0]} invokes {prefixed_skill} when both are listed")
+    if command_text is not None:
+        alias_list = find_lines(command_text, "available skills list")
+        if not alias_list:
+            problems.append(
+                f"{rel(command_md)} states no list-first rule (available skills list); a "
+                "non-plugin install pays one failed Skill call per /st before the retry"
+            )
+        else:
+            evidence.append(f"{rel(command_md)}:{alias_list[0]} list-first name rule")
 
     if problems:
         return bad(f"{len(problems)} namespace wiring problem(s)", problems)

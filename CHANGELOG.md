@@ -2,6 +2,14 @@
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow [semver](https://semver.org/).
 
+## Unreleased
+
+### Fixed
+
+- `/st` and the armorer/thinker spawns pick the registered name from the session's skill and agent
+  lists before calling. An `install.sh` install no longer pays one failed call per run on the
+  `smartthink:` name before the bare-name retry; the retry stays for runtimes that show no list.
+
 ## 3.0.2 (2026-09-26)
 
 ### Fixed
