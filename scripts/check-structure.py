@@ -128,6 +128,7 @@ ARMORER_SYNC_RULES = (
     ("research only after reading the references", r"레퍼런스를\s*먼저\s*읽은\s*뒤에\s*검색"),
     # Anchored to the body line "턴 예산 40턴." so the fallback preamble's "40턴을" cannot satisfy it.
     ("40-turn budget", r"턴\s*예산\s*40\s*턴\."),
+    ("browser lane capped at three calls per run", r"브라우저\s*호출은\s*한\s*런에\s*최대\s*3회"),
 )
 
 # Files another worker still owns. A missing or stale entry here reports SKIP instead of
