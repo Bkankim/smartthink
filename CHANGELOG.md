@@ -6,6 +6,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- The armorer can reach sources that plain fetches cannot. With a browser-agent MCP tool
+  (`mcp__aside__exec`) in the session, blocked, JS-rendered, and login-gated sources and live
+  marketplace data (job posts, listings) go to a browser lane: one whole-task call, read-only, at
+  most three per run. Before this the definition had no browser tool, so those sources were only
+  labeled "차단" and the pack lost its most direct market evidence.
 - `/st` and the armorer/thinker spawns pick the registered name from the session's skill and agent
   lists before calling. An `install.sh` install no longer pays one failed call per run on the
   `smartthink:` name before the bare-name retry; the retry stays for runtimes that show no list.

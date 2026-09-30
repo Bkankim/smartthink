@@ -257,6 +257,7 @@ Behavior in a degraded environment is fixed, not improvised.
 | `st-armorer` definition | Falls back to a general-purpose agent briefed with the full pack spec; failing that, the inline path |
 | `st-thinker` definition | `--report` falls back to a general-purpose agent driven by the bundled fallback prompt |
 | Search tools, or search fails | Pack section 3 is omitted, `manifest.research=false`, and the briefing says so. A missing tool is reported differently from a user-chosen `--nosearch` |
+| Browser agent (`mcp__aside__exec`) | No browser lane. Blocked, JS-rendered, and login-gated sources fall through to `insane-search`, then plain fetches |
 | `insane-search` skill | Plain fetches only. Blocked sources are labeled "차단" and skipped rather than worked around |
 | Vault | Seeded on the spot. With no profile, the briefing points you at `/st init` |
 | v2-format evolution state | Read as-is. Converted on the first `retain`, with the original backed up |
@@ -296,6 +297,9 @@ Behavior in a degraded environment is fixed, not improvised.
   `scripts/build-index.py` and `scripts/check-structure.py` are only for development.
 - macOS or Linux for `install.sh` (on Windows use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/)).
   The plugin route has no such restriction.
+- Optional: a browser-agent MCP tool (`mcp__aside__exec`). When present, the armorer delegates
+  blocked, JS-rendered, and login-gated sources and live marketplace data to it, read-only and at
+  most three calls per run.
 - Optional: the `insane-search` skill, for sources that block plain fetches. Without it those
   sources are skipped and labeled.
 - Codex and other non-Claude-Code harnesses are expected to work through the inline path, but that

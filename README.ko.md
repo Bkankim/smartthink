@@ -253,6 +253,7 @@ init은 그 경로를 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`�
 | `st-armorer` 정의 없음 | 팩 명세 전문을 브리핑한 general-purpose 에이전트로 폴백, 그것도 안 되면 인라인 경로 |
 | `st-thinker` 정의 없음 | `--report`가 동봉된 폴백 프롬프트를 쓴 general-purpose 에이전트로 내려간다 |
 | 검색 도구 없음 또는 실패 | 팩 3절 생략, `manifest.research=false`, 브리핑에 명시. 도구 결핍과 사용자가 끈 `--nosearch`는 구분해 표기한다 |
+| 브라우저 에이전트(`mcp__aside__exec`) 없음 | 브라우저 레인 없음. 막힌 소스·JS 렌더 페이지·로그인 소스는 `insane-search`, 그다음 일반 fetch로 내려간다 |
 | `insane-search` 스킬 없음 | 일반 fetch만 사용. 차단된 소스는 우회하지 않고 "차단"으로 표기한 뒤 건너뛴다 |
 | vault 없음 | 즉석에서 시드 생성. 프로필이 없으면 브리핑에 `/st init` 안내를 붙인다 |
 | 진화 상태가 v2 형식 | 읽기는 그대로. 첫 `retain` 때 원본을 백업하고 변환한다 |
@@ -290,6 +291,8 @@ init은 그 경로를 `${XDG_CONFIG_HOME:-~/.config}/smartthink/vault-pointer`�
   `scripts/check-structure.py`는 개발에만 필요하다.
 - `install.sh`는 macOS 또는 Linux(Windows는 [WSL2](https://learn.microsoft.com/en-us/windows/wsl/)).
   플러그인 경로에는 이 제약이 없다.
+- 선택: 브라우저 에이전트 MCP 도구(`mcp__aside__exec`). 있으면 armorer가 막힌 소스, JS 렌더 페이지,
+  로그인 소스, 실시간 마켓플레이스 데이터를 읽기 전용으로, 한 런 최대 3회 맡긴다.
 - 선택: 일반 fetch를 차단하는 소스를 위한 `insane-search` 스킬. 없으면 해당 소스는 표기하고
   건너뛴다.
 - Codex 등 Claude Code가 아닌 하네스는 인라인 경로로 동작할 것으로 보지만 아직 검증되지 않았다.
