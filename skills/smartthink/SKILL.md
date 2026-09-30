@@ -111,6 +111,7 @@ description: >
 |---|---|---|
 | Agent 도구 | 사용 가능한 도구 목록에 Agent가 있는가 | 있음 → **5a armorer 경로** / 없음 → **5b 인라인 경로** |
 | 검색 도구 | WebSearch·WebFetch 가용 여부 | 없으면 리서치 OFF로 고정하고 게이트에 표시 |
+| 브라우저 에이전트 | 도구 목록에 `mcp__aside__exec`가 있는가(armorer는 정의의 tools로 받는다) | 있으면 막힌 소스·SPA·로그인 소스·실시간 플랫폼 데이터를 브라우저 레인으로 가져온다(한 런 최대 3회). 없으면 아래 `insane-search` → WebFetch |
 | `insane-search` 스킬 | Skill 목록에 있는가 | 없으면 WebFetch만. 차단 소스는 "차단"으로 표기하고 건너뜀 |
 | `{SKILL_DIR}` | `${CLAUDE_SKILL_DIR}` 해석 여부 | 미해석이면 SKILL.md 위치에서 추론 |
 | `{VAULT}` 쓰기 | resolver `--ensure` 출력의 `vault_writable`이 `true`여야 쓰기 가능이다(vault 루트와 `packs/` 둘 다. 종료 코드 0만으로는 부족하다, 읽기 전용 vault도 0으로 끝난다). Bash로 따로 확인하지 마라. `false`면 resolver 실패와 같이 팩 없이 인라인 응답으로 대체하고 브리핑 첫 줄에 vault 쓰기 불가를 사유로 보고한다 | `--ensure`가 시드를 만든다. profile은 1단계 Read가 실패하면 없는 것이다. 없으면 브리핑에 `/st init` 안내 |
@@ -429,7 +430,7 @@ Agent 도구가 없거나 5a가 두 번 실패하면 이 경로다. **절차와 
 메인이 직접 수행한다.
 
 1. 선택 모듈의 레퍼런스 파일을 온전히 Read하라
-2. 리서치가 ON이면 검색하라. 레퍼런스를 먼저 읽었으므로 쿼리가 무장된 쿼리가 된다. `insane-search` 스킬이 있으면 차단 소스에 그것을 쓰고, 없으면 WebFetch만 쓰고 차단 소스는 "차단"으로 표기하고 건너뛰어라
+2. 리서치가 ON이면 검색하라. 레퍼런스를 먼저 읽었으므로 쿼리가 무장된 쿼리가 된다. 막힌 소스·SPA·로그인 소스·실시간 플랫폼 데이터는 브라우저 에이전트(`mcp__aside__exec`)가 있으면 armorer 정의 Step C의 브라우저 레인 규칙(과제 통째 위임, 읽기 전용, 한 런 최대 3회)으로 가져오고, 없으면 `insane-search` 스킬이 있을 때 그것을, 그것도 없으면 WebFetch만 쓰고 차단 소스는 "차단"으로 표기하고 건너뛰어라
 3. 아래 팩 명세대로 합성하라
 4. `{VAULT}/packs/<날짜>-<슬러그>/`에 `pack.md`와 `manifest.json`을 써라. 5절 원문은 5a와 같이 `assemble-pack.py`가 붙인다(armorer 정의 Step E와 같은 규칙):
    1. `pack.md`를 Write로 한 번 쓴다. 1~6절 전체를 쓰되 `## 5. 레퍼런스 원문` 제목 줄 아래 본문은 비워 둔다(digest 모드면 증류본과 DIGEST 마커를 여기서 5절 본문으로 쓰고 2는 건너뛴다)
@@ -629,6 +630,7 @@ digest 모드에서도 마커는 필수다. `sha256` 필드도 END 마커도 없
 | Agent에 `run_in_background` 없음(armorer가 백그라운드로 뜸) | 완료 알림까지 6단계 보류, 추측 출력 금지. 알림 뒤 반환 규약 확인 후 6단계([대기 규칙](#백그라운드-스폰-대기-규칙)) |
 | `smartthink:st-thinker` 정의 없음 | bare 재시도 실패 후 `--report`를 `general-purpose` + `thinker-prompt.md` 폴백 |
 | 검색 도구 없음/실패 | 팩 3절 생략, `manifest.research=false`, 브리핑에 명시 |
+| 브라우저 에이전트(`mcp__aside__exec`) 없음 | 브라우저 레인 생략. 막힌 소스는 `insane-search` → WebFetch 순서로 |
 | `insane-search` 없음 | WebFetch만. 차단 소스는 "차단"으로 표기하고 건너뜀 |
 | `uv` 없음 | `pip` → 없으면 설치 생략 |
 | vault 없음 | 시드 생성. profile 없으면 브리핑에 `/st init` 안내 |
