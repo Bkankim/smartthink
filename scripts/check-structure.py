@@ -1131,13 +1131,49 @@ SHELL_COMMAND_WORDS = {
 # A fenced block in one of these languages is all commands, whatever each line starts with.
 SHELL_FENCE_LANGS = {"bash", "sh", "shell", "zsh", "console"}
 SCRIPT_PATH_RE = re.compile(r"^(?:\{[A-Z_]+\}|~|\.{1,2})?/\S*\.(?:py|sh)$")
-ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=\S*$")
 # One parsed shell word that opens with VAR=: shlex drops the quotes, so the value may hold spaces.
 ASSIGNMENT_WORD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 FENCE_RE = re.compile(r"^[ \t>]*```[ \t]*(?P<lang>[\w-]*)[^\n]*\n(?P<body>.*?)^[ \t>]*```", re.M | re.S)
 INLINE_CODE_RE = re.compile(r"(?<!`)`(?P<code>[^`\n]+)`(?!`)")
 # A doc placeholder such as <모듈 파일명...> or <SETTINGS>, not a redirection.
 PLACEHOLDER_RE = re.compile(r"<[^<>\n]*[^<>\s\d&][^<>\n]*>")
+
+
+def _leading_word(text: str) -> tuple[str, str]:
+    """The first shell word of text and the text after it; ("", "") when there is none.
+
+    Split the way a shell would, so quotes are stripped and a quoted value keeps its spaces. Text
+    shlex cannot split (an unclosed quote, a trailing backslash) yields its whitespace word instead,
+    so a parse failure here never reaches the words already read before it (issue #43 1).
+    """
+    lexer = shlex.shlex(text, posix=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""  # a shell reads a mid-word # as part of the value (`V=a#b cmd`), shlex would drop the rest
+    try:
+        word = lexer.get_token()
+    except ValueError:
+        parts = text.split(None, 1)
+        return (parts[0], parts[1] if len(parts) > 1 else "") if parts else ("", "")
+    if word is None:
+        return "", ""
+    return word, text[lexer.instream.tell():]
+
+
+def _leading_assignments(command: str) -> tuple[list[str], str]:
+    """(names of the leading VAR=value words, the text that starts at the command word).
+
+    The one assignment judgment _compound_operator and _command_word share (issue #43 2): a quoted
+    `'V=1'` is the same assignment to both, and an unparseable word after a good assignment does not
+    undo that assignment.
+    """
+    names: list[str] = []
+    rest = command
+    while True:
+        word, after = _leading_word(rest)
+        if not ASSIGNMENT_WORD_RE.match(word):
+            return names, rest
+        names.append(word.split("=", 1)[0])
+        rest = after
 
 
 def _compound_operator(command: str) -> str | None:
@@ -1147,9 +1183,9 @@ def _compound_operator(command: str) -> str | None:
     leading VAR=value leave one command whose text no longer starts with the allow rule's prefix
     (issue #28 1). Single quotes make all of these an argument; double quotes still expand $( and `.
     """
-    first = command.split(" ", 1)[0]
-    if ASSIGNMENT_RE.match(first):
-        return f"{first.split('=', 1)[0]}="
+    assigned, _ = _leading_assignments(command)
+    if assigned:
+        return f"{assigned[0]}="
     command = PLACEHOLDER_RE.sub(lambda match: "x" * len(match.group(0)), command)
     quote = ""
     index = 0
@@ -1189,20 +1225,11 @@ def _command_word(command: str) -> str:
     """The word a shell runs: the first one after any leading VAR=value assignments.
 
     The line is split the way a shell would, so `V="my vault" python3 x.py` yields python3 and not
-    `vault"` (issue #37 4). Text shlex cannot split (an unclosed quote) falls back to whitespace words.
+    `vault"` (issue #37 4). Text shlex cannot split (an unclosed quote) falls back to whitespace words
+    from that word on; the assignments before it are still skipped (issue #43 1).
     """
-    lexer = shlex.shlex(command, posix=True)
-    lexer.whitespace_split = True
-    lexer.commenters = ""  # a shell reads a mid-word # as part of the value (`V=a#b cmd`), shlex would drop the rest
-    try:
-        for word in lexer:
-            if not ASSIGNMENT_WORD_RE.match(word):
-                return word
-    except ValueError:
-        for word in command.split():
-            if not ASSIGNMENT_RE.match(word):
-                return word
-    return ""
+    _, rest = _leading_assignments(command)
+    return _leading_word(rest)[0]
 
 
 def _is_command(command: str) -> bool:
