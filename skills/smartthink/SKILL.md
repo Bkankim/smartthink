@@ -379,7 +379,7 @@ Agent 도구에 `run_in_background` 파라미터가 없는 하네스가 있다. 
 
 **스폰 전에 하네스가 보여 주는 세션 에이전트 목록에서 이름을 먼저 골라라.** 목록에 `smartthink:<이름>`이 있으면 그것을, 없고 bare `<이름>`만 있으면 bare 이름을 첫 시도로 쓴다. 둘 다 있으면 접두어 이름이다. 추측으로 접두어 이름부터 던지면 접두어 없는 설치에서 매 실행이 실패 호출 1회를 먼저 먹는다.
 
-목록을 볼 수 없는 런타임에서만 아래 순서를 따른다. `smartthink:<이름>`이 not found면 bare `<이름>`으로 **1회만** 재시도하고, 그래도 실패해야 `general-purpose` 폴백으로 내려가라. 접두어 없는 설치(install.sh 심링크처럼 `~/.claude/agents/`에 놓는 사용자 레벨 설치)에서는 bare 이름이 정본이기 때문이다.
+목록을 볼 수 없는 런타임에서만 아래 순서를 따른다. `smartthink:<이름>`이 not found면 bare `<이름>`으로 **1회만** 재시도하고, 그래도 실패해야 `general-purpose` 폴백으로 내려가라. 접두어 없는 설치(install.sh 심링크처럼 `~/.claude/agents/`에 놓는 사용자 레벨 설치)에서는 bare 이름이 정본이기 때문이다. not found가 아닌 다른 스폰 오류는 bare 재시도 없이 바로 `general-purpose` 폴백으로 간다.
 
 > **bare 재시도가 뜬 에이전트가 이 정의라는 보장은 없다.** 같은 파일명의 구버전이 사용자 레벨에 남아 있으면 오류 없이 그것이 스폰된다. 재시도로 받은 반환이 아래 반환 규약을 어기면(팩 파일 부재, 절 구조 불일치) 정의가 다른 것으로 보고 `general-purpose` 폴백으로 내려가라.
 
@@ -418,7 +418,7 @@ Agent 도구에 `run_in_background` 파라미터가 없는 하네스가 있다. 
 
 ### 폴백
 
-1. 세션 목록에 두 이름이 모두 없으면 → 재시도 없이 바로 폴백이다(반드시 실패할 bare 호출을 던지지 마라). 목록을 볼 수 없어 던진 `smartthink:st-armorer` 스폰이 not found면 → 위 이름 해석 규칙대로 bare `st-armorer`로 1회만 재시도하고, **두 이름이 모두 실패**(정의 부재 포함)해야 폴백이다 → `{SKILL_DIR}/references/armorer-prompt.md`(폴백 SSOT)를 Read해 그 전문 끝에 위 Input 블록을 붙인 것을 prompt로 써서 `subagent_type: "general-purpose"`로 스폰하라. 전문을 요약하거나 다시 쓰지 마라. **git 이력(`git show`, `git log` 등)이나 다른 설치본에서 정의를 복구하지 마라** - git이 없는 설치(복사본·플러그인 캐시)에서도 동작해야 하고, 폴백 파일이 정의 본문의 동기화 사본이다. 백그라운드로 뜨면 위 대기 규칙이 그대로 적용된다.
+1. 세션 목록에 두 이름이 모두 없으면 → 재시도 없이 바로 폴백이다(반드시 실패할 bare 호출을 던지지 마라). 목록을 볼 수 없어 던진 `smartthink:st-armorer` 스폰이 not found면 → 위 이름 해석 규칙대로 bare `st-armorer`로 1회만 재시도하고, **두 이름이 모두 실패**(정의 부재 포함)해야 폴백이다. not found가 아닌 다른 스폰 오류는 bare 재시도 없이 바로 `general-purpose` 폴백으로 간다. 폴백으로 갈 때는 → `{SKILL_DIR}/references/armorer-prompt.md`(폴백 SSOT)를 Read해 그 전문 끝에 위 Input 블록을 붙인 것을 prompt로 써서 `subagent_type: "general-purpose"`로 스폰하라. 전문을 요약하거나 다시 쓰지 마라. **git 이력(`git show`, `git log` 등)이나 다른 설치본에서 정의를 복구하지 마라** - git이 없는 설치(복사본·플러그인 캐시)에서도 동작해야 하고, 폴백 파일이 정의 본문의 동기화 사본이다. 백그라운드로 뜨면 위 대기 규칙이 그대로 적용된다.
 2. 그것도 실패 → **5b 인라인 경로로 강등**하고 사용자에게 1줄로 알려라.
 
 ---
@@ -626,7 +626,7 @@ digest 모드에서도 마커는 필수다. `sha256` 필드도 END 마커도 없
 |---|---|
 | Agent 도구 없음(Codex 등) | 인라인 경로. 게이트에 리서치 비용 표시 |
 | `smartthink:` 접두어 이름이 세션 목록에 없음 | 목록에 있는 bare `st-armorer`/`st-thinker`를 첫 시도로(플러그인이 아닌 설치). 목록이 없으면 접두어 not found 뒤 bare로 1회 재시도. 반환이 계약을 어기면 다른 정의로 보고 폴백 |
-| `smartthink:st-armorer` 정의 없음 | 목록에 두 이름이 모두 없으면 즉시 `general-purpose` + `armorer-prompt.md` 폴백. 목록을 볼 수 없을 때만 bare 1회 재시도 후 실패하면 같은 폴백(git 이력 복구 금지). 폴백 파일도 없으면 인라인 |
+| `smartthink:st-armorer` 정의 없음 | 목록에 두 이름이 모두 없으면 즉시 `general-purpose` + `armorer-prompt.md` 폴백. 목록을 볼 수 없을 때만 bare 1회 재시도 후 실패하면 같은 폴백(git 이력 복구 금지). 폴백 파일이 없거나 `general-purpose` 폴백 자체가 실패하면 인라인 |
 | Agent에 `run_in_background` 없음(armorer가 백그라운드로 뜸) | 완료 알림까지 6단계 보류, 추측 출력 금지. 알림 뒤 반환 규약 확인 후 6단계([대기 규칙](#백그라운드-스폰-대기-규칙)) |
 | `smartthink:st-thinker` 정의 없음 | 목록에 두 이름이 모두 없으면 즉시 `--report`를 `general-purpose` + `thinker-prompt.md` 폴백. 목록을 볼 수 없을 때만 bare 1회 재시도 후 실패하면 같은 폴백 |
 | 검색 도구 없음/실패 | 팩 3절 생략, `manifest.research=false`, 브리핑에 명시 |
