@@ -29,6 +29,8 @@ CASES = (
     ("single-quoted value with space", f"V='my vault' {CMD}", "python3", True, True),
     ("value without space", f"V=myvault {CMD}", "python3", True, True),
     ("several assignments", f'A=1 V="my vault" B=\'x y\' {CMD}', "python3", True, True),
+    # final-review: shlex treats # as a comment start by default; a shell keeps it in the value.
+    ("value with a hash", f"COLOR=#fff V=foo#bar {CMD}", "python3", True, True),
     # Nothing a shell could run: the old whitespace rule stays, so the inline span is still not
     # judged (no crash is the requirement); the fence path was FAIL before and stays FAIL.
     ("unclosed quote", 'V="my vault python3 x.py', None, False, True),

@@ -32,6 +32,8 @@ GOAL_HANDOFF = (
     (FALLBACK, "Interpretation에 게이트에서 답한 목표(목표·성공 기준)가 있으면"),
     # issue #37 2: Step 0.5 mode B still assumed A/B/C, so the bias briefing and section 2 disagreed.
     (ANALYSIS, "주제만 온 경우 게이트에서 답한 목표(목표·성공 기준)가 있으면 그 목표의 재진술이고"),
+    (ANALYSIS, "게이트에서 답한 목표가 있으면 그 목표를 익숙한 다른 작업으로"),
+    (ANALYSIS, "게이트에서 답한 목표의 핵심어"),
 )
 
 

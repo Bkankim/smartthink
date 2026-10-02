@@ -1193,6 +1193,7 @@ def _command_word(command: str) -> str:
     """
     lexer = shlex.shlex(command, posix=True)
     lexer.whitespace_split = True
+    lexer.commenters = ""  # a shell reads a mid-word # as part of the value (`V=a#b cmd`), shlex would drop the rest
     try:
         for word in lexer:
             if not ASSIGNMENT_WORD_RE.match(word):
@@ -1545,6 +1546,8 @@ GOAL_HANDOFF_LINES = (
     (ARMORER_MD, "- **주제만 온 경우**:"),
     (ARMORER_PROMPT_MD, "- **주제만 온 경우**:"),
     (REFERENCES_DIR / "analysis-method.md", "1. **작업 해석** - 팩 2절 초안."),
+    (REFERENCES_DIR / "analysis-method.md", "   - **풀 3 - 작업 해석 유래**:"),
+    (REFERENCES_DIR / "analysis-method.md", "3. 각 편향을 아래 형식 3줄로 쓴다."),
 )
 
 
