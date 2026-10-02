@@ -22,6 +22,7 @@ INIT_ROW_OLD = "| ② | 현재 목표 | 2. 현재 목표 |"
 GATE_QUESTION = "   이번에 무엇을 하려는가? (목표·성공 기준 한 줄)\n"
 ARMORER = Path("agents") / "st-armorer.md"
 FALLBACK = Path("skills") / "smartthink" / "references" / "armorer-prompt.md"
+ANALYSIS = Path("skills") / "smartthink" / "references" / "analysis-method.md"
 # code-review of PR #32: the gate asked for the goal but the Input template, the pack spec and the
 # armorer's topic-only rule still said A/B/C, so the answer never reached pack section 2.
 GOAL_HANDOFF = (
@@ -29,6 +30,10 @@ GOAL_HANDOFF = (
     (SKILL, "주제만 온 경우 게이트에서 답한 목표가 있으면 그 목표의 재진술, 없으면 예상 작업 A/B/C)"),
     (ARMORER, "Interpretation에 게이트에서 답한 목표(목표·성공 기준)가 있으면"),
     (FALLBACK, "Interpretation에 게이트에서 답한 목표(목표·성공 기준)가 있으면"),
+    # issue #37 2: Step 0.5 mode B still assumed A/B/C, so the bias briefing and section 2 disagreed.
+    (ANALYSIS, "주제만 온 경우 게이트에서 답한 목표(목표·성공 기준)가 있으면 그 목표의 재진술이고"),
+    (ANALYSIS, "게이트에서 답한 목표가 있으면 그 목표를 익숙한 다른 작업으로"),
+    (ANALYSIS, "게이트에서 답한 목표의 핵심어"),
 )
 
 
