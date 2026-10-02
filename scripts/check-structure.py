@@ -34,6 +34,7 @@ import argparse
 import hashlib
 import json
 import re
+import shlex
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -1131,6 +1132,8 @@ SHELL_COMMAND_WORDS = {
 SHELL_FENCE_LANGS = {"bash", "sh", "shell", "zsh", "console"}
 SCRIPT_PATH_RE = re.compile(r"^(?:\{[A-Z_]+\}|~|\.{1,2})?/\S*\.(?:py|sh)$")
 ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=\S*$")
+# One parsed shell word that opens with VAR=: shlex drops the quotes, so the value may hold spaces.
+ASSIGNMENT_WORD_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
 FENCE_RE = re.compile(r"^[ \t>]*```[ \t]*(?P<lang>[\w-]*)[^\n]*\n(?P<body>.*?)^[ \t>]*```", re.M | re.S)
 INLINE_CODE_RE = re.compile(r"(?<!`)`(?P<code>[^`\n]+)`(?!`)")
 # A doc placeholder such as <모듈 파일명...> or <SETTINGS>, not a redirection.
@@ -1183,10 +1186,22 @@ def _compound_operator(command: str) -> str | None:
 
 
 def _command_word(command: str) -> str:
-    """The word a shell runs: the first one after any leading VAR=value assignments."""
-    for word in command.split():
-        if not ASSIGNMENT_RE.match(word):
-            return word
+    """The word a shell runs: the first one after any leading VAR=value assignments.
+
+    The line is split the way a shell would, so `V="my vault" python3 x.py` yields python3 and not
+    `vault"` (issue #37 4). Text shlex cannot split (an unclosed quote) falls back to whitespace words.
+    """
+    lexer = shlex.shlex(command, posix=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""  # a shell reads a mid-word # as part of the value (`V=a#b cmd`), shlex would drop the rest
+    try:
+        for word in lexer:
+            if not ASSIGNMENT_WORD_RE.match(word):
+                return word
+    except ValueError:
+        for word in command.split():
+            if not ASSIGNMENT_RE.match(word):
+                return word
     return ""
 
 
@@ -1530,6 +1545,9 @@ GOAL_HANDOFF_LINES = (
     (SKILL_MD, "    2. 작업 해석 ("),
     (ARMORER_MD, "- **주제만 온 경우**:"),
     (ARMORER_PROMPT_MD, "- **주제만 온 경우**:"),
+    (REFERENCES_DIR / "analysis-method.md", "1. **작업 해석** - 팩 2절 초안."),
+    (REFERENCES_DIR / "analysis-method.md", "   - **풀 3 - 작업 해석 유래**:"),
+    (REFERENCES_DIR / "analysis-method.md", "3. 각 편향을 아래 형식 3줄로 쓴다."),
 )
 
 
