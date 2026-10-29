@@ -43,7 +43,7 @@ description: >
 
 `{SKILL_DIR}`과 `{VAULT}`는 보통 작업 디렉터리 밖이다. `/st init`이 설치하는 허용 규칙 묶음(vault Edit, 스킬 디렉터리 Read, `resolve-vault.py`·`assemble-pack.py` Bash)은 아래 모양의 호출만 덮는다. 모양이 다르면 규칙과 무관하게 호출마다 권한 프롬프트가 뜬다(`tests/evidence/T16-before.md`).
 
-- **파일 읽기는 Read, 존재 확인은 Glob으로 한다.** `ls`·`cat`·`grep`·`head`·`test` 같은 확인용 Bash를 쓰지 마라. 작업 디렉터리 밖을 읽는 Bash는 허용 규칙이 있어도 매번 묻는다. vault의 Read·Glob은 vault Edit 규칙이, `{SKILL_DIR}`의 Read는 스킬 디렉터리 Read 규칙이 덮는다.
+- **파일 읽기와 존재 확인은 Read로 한다.** Glob은 쓰지 않는다. Grep은 도구 목록에 있을 때만 쓰고, 없으면 Read로 찾는다. Glob·Grep이 없는 하네스가 있다(Claude Code 2.1.312의 `claude -p`). `ls`·`cat`·`grep`·`head`·`test` 같은 확인용 Bash를 쓰지 마라. 작업 디렉터리 밖을 읽는 Bash는 허용 규칙이 있어도 매번 묻는다. vault의 Read는 vault Edit 규칙이, `{SKILL_DIR}`의 Read는 스킬 디렉터리 Read 규칙이 덮는다.
 - **무장 중 Bash는 규칙 묶음의 아래 명령뿐이다.** 메인 세션: `python3 {SCRIPTS_DIR}/resolve-vault.py --ensure`(항상 1회), `python3 {SCRIPTS_DIR}/resolve-vault.py --module-sizes <모듈...>`(index.json이 없을 때만), `python3 {SCRIPTS_DIR}/assemble-pack.py ...`(5b 인라인 경로에서만), 사용자 레벨 스킬 폴더면 위 `readlink {SKILL_DIR}` 1회. armorer: `python3 {SCRIPTS_DIR}/assemble-pack.py ...` 1회(manifest `created`용 `date` 한 줄은 경로 없는 읽기 전용 명령이라 프롬프트가 없다). 이 밖의 Bash는 쓰지 마라.
 - 스크립트는 `python3 {SCRIPTS_DIR}/<스크립트> <인자>` 모양으로 **따옴표 없이 절대경로 한 줄**로 호출한다. 이 앞부분이 허용 규칙의 접두어다. 예외: `{SCRIPTS_DIR}`에 공백이나 셸 특수 문자가 없으면(resolver 출력 `bash_rules_effective: true`) 이 모양 그대로 쓰고, 있으면(`false`) 스크립트 경로만 큰따옴표로 감싼다(경로에 `$`·백틱·`\`가 있으면 작은따옴표). 감싸지 않으면 경로가 여러 단어로 쪼개져 실행되지 않는다. 감싼 명령은 규칙 접두어와 달라 호출마다 승인 프롬프트가 뜨고, 그 경우는 감수한다. `;`·`&&`·`||`·파이프·`cd`·리다이렉션·`$(...)`를 섞지 말고, 명령 두 개가 필요하면 Bash 호출을 두 번 한다.
 
@@ -412,7 +412,7 @@ Agent 도구에 `run_in_background` 파라미터가 없는 하네스가 있다. 
 
 **armorer는 팩 파일을 Write하고 manifest 요약만 반환한다.** 팩 본문을 반환값으로 받지 마라. 본문이 반환값으로 돌아오면 armorer 창에서 소화하기로 한 원문이 메인 컨텍스트에 두 번 실린다.
 
-반환에서 확인할 것: 팩 디렉터리 경로, 실제 포함 모듈, 리서치 수행 여부, 실제 추정 토큰. 게이트에서 표시한 값과 크게 다르면 6단계 브리핑 말미에 차이를 1줄로 알려라. 팩 파일 존재는 Glob(`{팩 디렉터리}/*`)으로, 절 구조는 6단계의 pack.md Read 결과로 확인한다. `ls`·`grep` 같은 Bash로 확인하지 마라([세션 도구 규율](#세션-도구-규율)).
+반환에서 확인할 것: 팩 디렉터리 경로, 실제 포함 모듈, 리서치 수행 여부, 실제 추정 토큰. 게이트에서 표시한 값과 크게 다르면 6단계 브리핑 말미에 차이를 1줄로 알려라. 팩 파일 존재는 `{팩 디렉터리}/manifest.json` Read로, pack.md 존재와 절 구조는 6단계의 pack.md Read 결과로 확인한다. 6단계의 pack.md Read가 실패하거나 절 제목이 다르면 아래 위반 조건으로 보고 브리핑을 출력하지 말고 폴백 사슬의 다음 단계로 내려간다. `ls`·`grep` 같은 Bash로 확인하지 마라([세션 도구 규율](#세션-도구-규율)).
 
 **위반 조건**: 반환된 팩 디렉터리에 `pack.md`나 `manifest.json`이 없거나(팩 파일 부재), `pack.md`의 절 제목이 [팩 명세](#팩-명세)의 6개 문자열과 다르면(절 구조 불일치) 반환 규약 위반이다. `무장 실패: <사유>` 반환도 팩 파일 부재로 본다. 위반이면 [이름 해석 규칙](#에이전트-이름-해석-규칙)대로 폴백 사슬의 다음 단계로 내려간다.
 
@@ -440,7 +440,7 @@ Agent 도구가 없거나 5a가 두 번 실패하면 이 경로다. **절차와 
    - **Bash가 없는 하네스**는 기존 방식대로 `pack.md` 전체(5절 원문 포함)를 Write로 쓴다. 5절은 Read한 원문을 한 글자도 바꾸지 않고 옮기고 마커 형식은 `references/analysis-method.md`의 "원문 무결성 규칙"을 따른다
 5. 그대로 6단계로 진행하라
 
-**`pack.md`와 `manifest.json`을 둘 다 Write하기 전에는 턴을 끝내지 마라.** 검색 뒤 받은 "지금 답하라" 류 지시도 팩 Write와 6단계 브리핑으로 수행한다. 브리핑 전에 두 파일이 있는지 Read 또는 Glob으로 확인한다(Bash가 없는 하네스도 있다).
+**`pack.md`와 `manifest.json`을 둘 다 Write하기 전에는 턴을 끝내지 마라.** 검색 뒤 받은 "지금 답하라" 류 지시도 팩 Write와 6단계 브리핑으로 수행한다. 브리핑 전에 `manifest.json`을 Read해 두 번째 Write가 끝났는지 확인한다. pack.md는 6단계 Read가 확인하므로 여기서 따로 읽지 않는다(팩 원문을 두 번 싣지 않기 위해서다).
 
 인라인에서는 이미 모듈 원문이 메인 컨텍스트에 있으므로 6단계의 pack.md Read는 브리핑 절만 확인하는 용도다.
 

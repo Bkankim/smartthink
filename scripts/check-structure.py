@@ -113,6 +113,7 @@ THINKER_SYNC_RULES = (
     ("no duplicate module loading", r"중복\s*로딩\s*금지"),
     ("references the fixed pack section structure", r"pack\.md\s*절\s*구조"),
     ("30-turn budget", r"30\s*턴"),
+    ("Grep only when listed, no grep Bash fallback", r"Grep은\s*도구\s*목록에\s*있을\s*때만\s*호출하라"),
 )
 
 # Same idea for the armorer: references/armorer-prompt.md is what general-purpose receives
@@ -130,6 +131,7 @@ ARMORER_SYNC_RULES = (
     # Anchored to the body line "턴 예산 40턴." so the fallback preamble's "40턴을" cannot satisfy it.
     ("40-turn budget", r"턴\s*예산\s*40\s*턴\."),
     ("browser lane capped at three calls per run", r"브라우저\s*호출은\s*한\s*런에\s*최대\s*3회"),
+    ("Grep/Glob only when listed, no ls/grep Bash fallback", r"Grep·Glob은\s*도구\s*목록에\s*있을\s*때만\s*호출하고,\s*없으면\s*Read로\s*찾으며\s*`ls`·`grep`으로\s*대신하지\s*마라"),
 )
 
 # Files another worker still owns. A missing or stale entry here reports SKIP instead of
