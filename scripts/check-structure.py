@@ -33,6 +33,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import shlex
 import traceback
@@ -178,6 +179,31 @@ PRIVATE_PATTERNS = (
     ("/Users" + "/", "hardcoded absolute home path"),
     ("smartthink-v3" + ".md", "private design document"),
 )
+
+
+def _load_local_private_patterns() -> tuple[tuple[str, str], ...]:
+    """Maintainer-only patterns kept outside the repository.
+
+    Lines are ``pattern<TAB>reason``; ``#`` starts a comment. The file path comes from
+    SMARTTHINK_PRIVATE_PATTERNS or defaults to ~/.config/smartthink/private-patterns.txt.
+    A missing file adds nothing, so contributors run the same check without it.
+    """
+    path = Path(os.environ.get("SMARTTHINK_PRIVATE_PATTERNS", "~/.config/smartthink/private-patterns.txt")).expanduser()
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ()
+    out = []
+    for line in lines:
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        pattern, _, why = line.partition("\t")
+        if pattern:
+            out.append((pattern, why or "maintainer-only private pattern"))
+    return tuple(out)
+
+
+PRIVATE_PATTERNS = PRIVATE_PATTERNS + _load_local_private_patterns()
 
 # Prose that records the removal of a v2 feature is fine; wiring that still uses it is not.
 ABOLITION_WORDS = ("폐지", "삭제", "제거", "없어졌", "사라졌", "abolish", "deprecat", "removed", "absorbed")
