@@ -302,8 +302,8 @@ Behavior in a degraded environment is fixed, not improvised.
   most three calls per run.
 - Optional: the `insane-search` skill, for sources that block plain fetches. Without it those
   sources are skipped and labeled.
-- Codex and other non-Claude-Code harnesses are expected to work through the inline path, but that
-  is not yet verified.
+- Codex runs the inline path: verified with `--nosearch` on 2026-09-27 (`tests/gates.md` T13).
+  Research ON under Codex is not verified, and other non-Claude-Code harnesses are untested.
 
 ---
 
