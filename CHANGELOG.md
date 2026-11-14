@@ -6,6 +6,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); version
 
 ### Fixed
 
+- The arming gate asks through a Claude Code choice dialog (`AskUserQuestion`): goal, module
+  setup (presets, the first one is the recommendation, with a preview of modules and cost), and
+  research, in one call. Arming starts in the same turn; closing the dialog or an away-from-keyboard
+  auto-submit arms nothing. Before this the gate printed "Enter 진행", but an empty Enter does not
+  submit in Claude Code or Codex, and the default (all five modules) disagreed with the
+  recommendation. Harnesses without the dialog keep the text gate and take a typed `진행`. The
+  re-arm warning and the `/st init` interview drop their Enter hints the same way.
 - The armorer can reach sources that plain fetches cannot. With a browser-agent MCP tool
   (`mcp__aside__exec`) in the session, blocked, JS-rendered, and login-gated sources and live
   marketplace data (job posts, listings) go to a browser lane: one whole-task call, read-only, at

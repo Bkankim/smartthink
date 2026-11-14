@@ -74,7 +74,7 @@ CLAUDE_CONFIG_DIR="$ST_CFG" CLAUDE_CODE_OAUTH_TOKEN="$ANTHROPIC_OAUTH_TOKEN" SMA
 - 격리 설정에는 로그인 정보가 없다. 인증은 `CLAUDE_CODE_OAUTH_TOKEN`을 이 자식 프로세스 환경에만 넣어 주입한다. 값은 이미 셸 환경에 있는 변수(예: `$ANTHROPIC_OAUTH_TOKEN`)로 참조하고 명령줄에 리터럴로 쓰지 않는다. 리터럴은 셸 히스토리에 남는다. 토큰 값은 증거·로그에 남기지 않는다(`[REDACTED]`).
 - 첫 실행은 폴더 신뢰 확인 화면이 뜬다. `Yes, I trust this folder`를 고른다.
 - 격리 설정의 기본 권한 모드는 auto다(상태줄 `⏵⏵ auto mode on`). 권한 프롬프트를 관찰하는 게이트는 `--permission-mode default`를 붙이고 상태줄이 `⏸ manual mode on`인지 확인한다.
-- 게이트에서 빈 Enter는 Claude Code·Codex 입력창이 비어 있으면 제출되지 않는다. `진행`처럼 텍스트로 답하고 그 사실을 트랜스크립트에 적는다.
+- 대화형 Claude Code 게이트는 선택창(`AskUserQuestion`)으로 묻는다(#46). 선택창에서 고른 답을 트랜스크립트에 적는다. 선택창이 없는 하네스(Codex 등)는 평문 게이트이고, 빈 Enter는 입력창이 비어 있으면 제출되지 않으므로 `진행`처럼 텍스트로 답한다.
 
 임시 vault는 모든 증거를 옮기고 결과 요약표를 채운 뒤에만 정리한다. 대상 변수를 먼저 확인한 뒤 다음 명령을 쓴다. 빈 변수나 실제 vault에 이 명령을 적용하지 않는다.
 
@@ -106,7 +106,7 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 - **사전 조건**: T1 PASS, `agents/st-armorer.md` 존재, Agent 도구와 검색 도구가 사용 가능한 Claude 세션, 해당 vault에 같은 주제 팩이 없어야 한다.
 - **입력**: `/st --budget 60000 공공 도서관의 예약 대기열 안내 화면을 개선하는 실행 계획을 설계해줘`
 - **통과 기준**:
-  - 진행 전 `━━ SmartThink 무장 게이트 ━━`가 표시되고 입력 해석, 진단, 5개 추천 모듈, 리서치 상태, 조작 항목이 보인다.
+  - 진행 전 `━━ SmartThink 무장 게이트 ━━`가 표시되고 입력 해석, 진단, 5개 추천 모듈, 리서치 상태가 보인다. 대화형 Claude Code면 이어서 목표·모듈·리서치 선택창이 한 번 뜨고 모듈 첫 칸이 "(추천)"이며, 선택창이 없으면 6항목 조작 안내가 보이고 Enter 안내는 없다.
   - 예상 비용에 `메인에 실릴 팩`과 `서브에이전트 작업`의 두 단위가 모두 토큰 추정치로 표시된다.
   - 승인 후 armorer가 동기로 실행되어 `$SMARTTHINK_VAULT/packs/<날짜>-<슬러그>/pack.md`와 `manifest.json` 한 쌍을 만든다.
   - `manifest.json`에 정확히 `task`, `interpretation`, `cynefin`, `classification`, `modules`, `budget`, `research`, `profile_version`, `est_tokens`, `created`, `harness` 필드가 있고, `est_tokens` 안에 `pack`과 `agent`가 있다.
@@ -125,7 +125,7 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
   - 게이트의 `1. 입력 해석`에 `주제만 들어왔습니다. 예상 작업:`과 A, B, C가 모두 표시된다.
   - 게이트 1항목이 이번 목표·성공 기준을 한 줄로 묻는다.
   - 팩의 `## 2. 작업 해석`에 예상 작업 A/B/C가 각각 구체적인 작업 또는 결정으로 남아 있다.
-  - Enter로 진행했을 때 A/B/C 셋 모두가 팩 2절에 남는다.
+  - 목표 질문에서 "셋 다"를 고르면(평문 게이트면 `진행`으로 답하면) A/B/C 셋 모두가 팩 2절에 남는다.
 - **증거**: `T3-pack.md`에 생성 pack 전문, `T3-transcript.md`에 게이트 입력 해석부터 진행 승인까지의 발췌를 남긴다.
 
 ### T4. `--digest` 팩
@@ -267,7 +267,7 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 - **로딩된 SKILL.md 확인**: `-p` 표준 출력에는 마지막 메시지만 나오므로 세션 트랜스크립트(`<설정 디렉터리>/projects/<cwd 슬러그>/*.jsonl`)에서 `Base directory for this skill:` 줄을 찾아 리포 SKILL.md인지 확인하고 증거에 남긴다. 실제 설정에서는 사용자 레벨 심링크(`~/.claude/skills/smartthink`, `~/.claude/commands/st.md`)가 다른 체크아웃을 가리킬 수 있다. `/st`는 그 경로에서 어느 명령 정의가 잡혔는지(사용자 레벨 st.md 또는 플러그인 `smartthink:st`)도 기록한다.
 - **통과 기준**:
   - **비대화식 지시 문구 없이 원문 입력만으로** 두 경로 모두 팩(`pack.md`+`manifest.json`)이 완성된다. 게이트에서 턴이 끝나거나 "진행할까요?"로 끝나면 FAIL이다.
-  - 대화형 Enter나 예산 답을 기다리지 않고 무장 게이트를 자동 진행한다. 헤드리스에서 6항목 게이트 블록 출력은 선택이다(SKILL.md 4단계). 판정은 아래 표준 출력 요약 줄로 한다.
+  - 선택창·대화형 답을 기다리지 않고 무장 게이트를 자동 진행한다. 헤드리스에서 6항목 게이트 블록 출력은 선택이다(SKILL.md 4단계). 판정은 아래 표준 출력 요약 줄로 한다.
   - `-p` 표준 출력에는 마지막 응답만 남으므로, 표준 출력에 `헤드리스: 자동 진행 | 상한 NK | 절삭: … | 복원: 없음 | 팩: …` 요약 줄이 있다. 이 줄이 필수 판정 근거다.
   - 출력에 헤드리스 상한 120K가 적용되었음이 드러난다. 전달한 `--budget 200000`이 120K보다 우선하지 않는다(manifest `budget`이 120000 이하). 게이트 추정치가 상한 이하여야 한다. 완성 팩의 실측 `est_tokens.pack`이 상한을 넘는 것은 절삭 1패스·복원 없음 규칙상 FAIL이 아니며, 그 초과가 출력에 고지되어 있으면 된다.
   - 추정치가 120K를 넘으면 SKILL.md의 "예산 초과 시 절삭 순서"대로 실제 적용한 절삭과 이유, 복원 여부가 출력에 남는다.
@@ -329,7 +329,7 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
   ```
   `/smartthink:smartthink init` → ⑤에서 진짜 보관소 후보를 고르고 `.gitignore` 질문과 권한 규칙 설치를 승인한다. 세션을 닫고 같은 명령으로 새 세션을 열어 `/smartthink:smartthink --nosearch 지역 도서관 좌석 예약 안내를 개선해줘`로 무장한다.
 - **통과 기준**:
-  - ⑤에 후보마다 신호·마지막 수정일·대략 파일 수·git 여부·경고가 붙은 목록과 "새로 만들기(기본값)"·"직접 입력"이 뜨고, 어느 후보도 미리 골라 두지 않는다(Enter 수락 기본값·추천 표시 없음). 안 쓰는 기본 vault와 작업 폴더 루트에 경고가 붙는다.
+  - ⑤에 후보마다 신호·마지막 수정일·대략 파일 수·git 여부·경고가 붙은 목록과 "새로 만들기(기본값)"·"직접 입력"이 뜨고, 어느 후보도 미리 골라 두지 않는다(수락 기본값·추천 표시 없음, 선택창이 아닌 번호 목록). 안 쓰는 기본 vault와 작업 폴더 루트에 경고가 붙는다.
   - 고른 보관소의 `<보관소>/smartthink/`가 vault가 되고 기존 파일은 그대로다. git 리포면 `packs/` 제외 여부를 묻는다.
   - 포인터가 가짜 홈의 `~/.config/smartthink/vault-pointer`에 기록되고 resolver가 `source: pointer`로 같은 경로를 낸다.
   - `permission_rule_effective: true`로 규칙을 제안하고 승인 시 격리 settings.json에 보존 머지한다.
@@ -399,3 +399,4 @@ test -n "$ST_CFG" && test -d "$ST_CFG" && rm -rf "$ST_CFG"   # 격리 설정 세
 | T15 | PASS | 2026-09-27 | T15-rerun.md, T15-protected-probe.md | final-review 20260927-032439 후속 재실측(브랜치 st-20-vault-location 1b01df4, #21 병합 포함, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`, 가짜 `HOME`, 읽기 도구 사전 허용 원문 기록). init이 ⑤ 확정 전에 기본 위치를 만들지 않았고(빈 폴더 잔존 해소), 후보 3개 자동 선택 없이 제시 → 3번 → 포인터·`.gitignore` → `Edit` + `assemble-pack` Bash 규칙 설치. 새 세션 무장 2회(`--digest`, 원문 1모듈)에서 pack.md·manifest.json Write와 assemble-pack Bash 모두 무프롬프트(vault 쓰기 관련 프롬프트 0회). 남은 7회는 cwd 밖을 읽는 복합 읽기 Bash |
 | T16 | PASS | 2026-09-27 | T16-before.md, T16-after.md | #26 실측(브랜치 fix-26-main-bash-prompts, Claude Code 2.1.283, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`, 가짜 `HOME`, 작업 디렉터리가 플러그인·vault 밖, Read·Glob·Bash 사전 허용 없음). 수정 전 main 코드는 init 규칙 2개 설치 상태에서 무장 1회에 10회(스킬 디렉터리 Read 9, resolver Bash 1). 수정 후 init이 `resolve-vault.py --permission-rule` 한 번의 출력으로 Edit(vault)·Read(스킬 디렉터리)·Bash 2개를 묻고 승인분을 보존 머지, 새 세션 무장 2회(`--digest`, 원문)에서 메인·armorer 합계 0회. 메인 Bash는 resolver 한 줄뿐, 확인은 Read·Glob. 팩 `--pack` H 5/5 두 개. final-review 후속(3b995c4): install.sh 설치(가짜 HOME)에서 링크 경로 Read가 체크아웃 경로 규칙과 어긋나 9회 → `read_rules`에 링크 경로 규칙을 더해 0회 |
 | T16 | PASS | 2026-10-29 | T16-rerun.md | 재실측(main 519b1e8, #37~#44 머지 뒤, Claude Code 2.1.312, default 권한 모드, 격리 `CLAUDE_CONFIG_DIR`, 가짜 `HOME`, 작업 디렉터리가 플러그인·vault 밖, Read·Glob·Bash 사전 허용 없음). init이 `--permission-rule` 한 번의 출력으로 규칙 4개를 묻고 보존 머지. 새 세션 무장 2회(`--digest`, 원문 assemble-pack 경유)에서 메인·armorer 합계 0회, 메인 Bash는 resolver 한 줄뿐. 게이트 목표 답이 팩 2절에 전달(#30). 팩 `--pack` 5/5 두 개. 이 브랜치 최종본(존재 확인 Read 고정)으로 무장 1회 추가 재실측: 프롬프트 0회, Glob 0회, `--pack` 5/5 |
+| T1·T3 | PASS | 2026-11-14 | T46-dialog.md | #46 선택창 게이트 실측(브랜치 fix-46-gate-askuser, Claude Code 2.1.325, 격리 `CLAUDE_CONFIG_DIR`, auto 모드). 목표·모듈·리서치 선택창 1회, 모듈 첫 칸 `★3개 (추천)`과 미리보기. Esc는 `User declined to answer questions`로 하네스가 턴을 끝내고 무장 없음. 추천대로 제출하면 같은 턴에서 팩 생성, `--pack` 5/5, 목표 답이 manifest interpretation에 전달. 자리비움 자동 제출과 Codex 평문 게이트는 미실측 |
