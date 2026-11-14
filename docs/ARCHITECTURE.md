@@ -49,8 +49,9 @@ search.
 **(d) A gate before the expensive commit.** Reading references and running research is the moment
 cost becomes unrecoverable. Immediately before it, and only there, the system stops and shows the
 user the interpreted task, the diagnosis, the selected modules, and the estimated cost in two units:
-what will land in the main context, and what the sub-agent will burn. The user can adjust modules,
-set a budget, or turn research off. This is the one required interaction in the system, and its
+what will land in the main context, and what the sub-agent will burn. The user confirms the goal, picks a
+module setup, and turns research on or off in one choice dialog (`AskUserQuestion`), or types a
+change where no dialog exists; a budget cap comes from `--budget N`. Closing the dialog arms nothing. This is the one required interaction in the system, and its
 placement is the whole point: it is the last cheap moment before an expensive commitment.
 
 **(e) End the turn at the briefing.** Arming is preparation, not a conclusion. When the pack is

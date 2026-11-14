@@ -1807,6 +1807,43 @@ def check_headless_gate_branch() -> Result:
     return ok("SKILL.md states tool-free headless signals and a headless branch in the gate and --budget")
 
 
+
+# Issue #46: the gate printed "Enter 진행", but an empty Enter does not submit in Claude Code or
+# Codex. Interactive runs with AskUserQuestion ask through it; no user-facing text may tell the
+# user to press Enter.
+GATE_DIALOG_HEADING = "### 선택창 게이트"
+GATE_DIALOG_RULES = ("AskUserQuestion", "같은 턴에서 5단계로", "무장하지 마라", "(추천)")
+# A hint that tells the user to press Enter: "Enter = 진행", "(Enter = 수락)", "Enter    진행",
+# "Enter 하나로 수락". Prohibitions that name Enter ("Enter를 안내하지 마라") do not match.
+ENTER_HINT_RE = re.compile(r"Enter\s*=|Enter\s+(?:진행|하나로)")
+ENTER_HINT_FILES = (SKILL_MD, REFERENCES_DIR / "lifecycle.md", REPO_ROOT / "README.md", REPO_ROOT / "README.ko.md")
+
+
+def check_gate_asks_through_dialog() -> Result:
+    """SKILL.md has an AskUserQuestion gate branch, and no prompt tells the user to press Enter."""
+    problems: list[str] = []
+    text = read_text(SKILL_MD)
+    if text is None:
+        return bad(f"{rel(SKILL_MD)} is missing or unreadable")
+    start = text.find(GATE_DIALOG_HEADING)
+    end = text.find("\n#", start + len(GATE_DIALOG_HEADING)) if start >= 0 else -1
+    body = text[start:end if end >= 0 else len(text)] if start >= 0 else ""
+    if not body:
+        problems.append(f"{rel(SKILL_MD)}: no {GATE_DIALOG_HEADING!r} section")
+    for phrase in GATE_DIALOG_RULES:
+        if body and phrase not in body:
+            problems.append(f"{rel(SKILL_MD)}: {GATE_DIALOG_HEADING!r} lacks {phrase!r}")
+    for path in ENTER_HINT_FILES:
+        content = read_text(path)
+        if content is None:
+            problems.append(f"{rel(path)} is missing or unreadable")
+            continue
+        for match in ENTER_HINT_RE.finditer(content):
+            problems.append(f"{rel(path)}:{line_of(content, match.start())} tells the user to press Enter")
+    if problems:
+        return bad(f"{len(problems)} gate dialog problem(s)", problems)
+    return ok("SKILL.md asks the gate through AskUserQuestion and no prompt relies on an empty Enter")
+
 # ----------------------------------------------------------------- F. v2 leftovers
 
 
@@ -2303,6 +2340,7 @@ CHECKS: tuple[tuple[str, str, object], ...] = (
     ("D", "wiring: SKILL.md arming Bash stays inside the rule bundle", check_skill_bash_inside_bundle),
     ("D", "wiring: lifecycle.md Bash is the bundle or a recorded exception", check_lifecycle_bash_inventory),
     ("D", "wiring: headless gate signals and branches", check_headless_gate_branch),
+    ("D", "wiring: gate asks through a dialog, no Enter hints", check_gate_asks_through_dialog),
     ("E", "schema: evolution-state.md v3 header", check_evolution_state_schema),
     ("E", "schema: profile.md v3 header", check_profile_schema),
     ("E", "schema: profile.md six blocks in order", check_profile_blocks),

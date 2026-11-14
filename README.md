@@ -169,16 +169,28 @@ so it shows you the bill before you pay it:
    ※ 두 값 모두 추정이며 실제와 다를 수 있습니다.
 
 5. 리서치: ON (기본)
-
-6. 조작
-   Enter    진행
-   숫자     예산 상한 지정 (예: 60000)
-   모듈 ±   추가·제거 (예: "메타인지 빼고 유니콘 플레이북 넣어")
-   --nosearch  리서치 끄기
 ```
 
-Typing `60000` there trims in a fixed order: shrink research first, then drop whole low-priority
-modules, then compress the application layer. **A module is never cut in half.** Truncating source
+Then a Claude Code choice dialog opens. Move with the arrow keys and submit with Enter.
+
+```
+목표    ❯ 빌드 대 개선 결정 (현재 해석)
+          개선안의 범위만 정하기
+          Other (직접 입력)
+모듈    ❯ ★ 3개 (추천) ≈81K       옆 미리보기: 구성 모듈과 힌트, 팩/작업 추정치
+          5개 전부 ≈123K
+          ★ 3개 + 패턴 합성 ≈98K
+          Other (예: "메타인지 빼고 유니콘 플레이북 넣어")
+리서치  ❯ ON (추천)
+          OFF
+```
+
+The first option is the recommended setup, so submitting as is follows the recommendation. Once you
+answer, arming starts in the same turn; closing the dialog arms nothing. Where there is no dialog
+(Codex and the like), the same content is printed as text and you type `진행` (proceed) or a change.
+
+With a cap such as `--budget 60000`, it trims in a fixed order: drop whole low-priority modules
+first, then shrink research, then compress the application layer. **A module is never cut in half.** Truncating source
 text turns the pack back into a summary, which is the one thing this tool exists to avoid.
 
 Running headless, the gate auto-proceeds under a 120K cap and reports what it trimmed.
